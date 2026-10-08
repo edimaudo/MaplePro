@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% import "_m.html" as m %}
+{% block body %}
+<h1 class="text-2xl font-semibold">Approvals &amp; Audit</h1>
+<a class="mt-2 inline-block text-sm text-blue-700 underline" href="/audit.csv">Export audit log (CSV)</a>
+<p class="text-sm text-slate-500">Reminders run automatically. Invoices and payouts need approval; staff can approve up to {{limit|money}}, admins any amount.</p>
+<h2 class="mt-4 mb-2 font-medium">Pending ({{pending|length}})</h2>
+<div class="space-y-3">{% for a in pending %}{{ m.card(a) }}{% else %}<p class="text-sm text-slate-500">Nothing waiting. Draft a reminder on Financial Intelligence, or submit a daily report on a project.</p>{% endfor %}</div>
+<h2 class="mt-6 mb-2 font-medium">History</h2>
+<div class="space-y-3">{% for a in history %}{{ m.card(a) }}{% else %}<p class="text-sm text-slate-500">No decisions yet.</p>{% endfor %}</div>
+{% endblock %}

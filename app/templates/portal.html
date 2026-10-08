@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% import "_m.html" as m %}{% block body %}
+<h1 class="text-2xl font-semibold">My work</h1>
+<h2 class="mt-4 mb-2 font-medium">Projects</h2>
+<div class="grid gap-3 md:grid-cols-3">{% for p in projects %}<div class="rounded-lg border bg-white p-4"><div class="font-medium text-sm">{{p.name}}</div><div class="mt-2 text-xs">Progress {{p.progress}}%</div><div class="h-2 rounded bg-slate-100"><div class="h-2 rounded bg-blue-600" style="width:{{p.progress}}%"></div></div></div>{% else %}<p class="text-sm text-slate-500">No projects assigned.</p>{% endfor %}</div>
+{% if u.role=='client' %}<h2 class="mt-6 mb-2 font-medium">Invoices</h2>
+<div class="rounded-lg border bg-white divide-y">{% for i in invoices %}<div class="flex justify-between p-3 text-sm"><span>{{i.number}} · {{i.project}}</span><span>{{i.amount|money}} · {{i.status}} · due {{i.due_date}}</span></div>{% endfor %}</div>
+{% else %}<h2 class="mt-6 mb-2 font-medium">Submit timesheet</h2>
+<form method="post" action="/timesheets" class="flex flex-wrap items-end gap-2 text-sm">
+  <label>Project<select name="project_id" class="block rounded-md border px-2 py-1.5">{% for p in projects %}<option value="{{p.id}}">{{p.name}}</option>{% endfor %}</select></label>
+  <label>Date<input type="date" name="work_date" required class="block rounded-md border px-2 py-1.5"></label>
+  <label>Hours<input type="number" step="0.5" min="0.5" max="24" name="hours" required class="block w-24 rounded-md border px-2 py-1.5"></label>
+  <button class="rounded-md bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700">Submit</button></form>
+<h2 class="mt-6 mb-2 font-medium">My timesheets</h2><div class="rounded-lg border bg-white divide-y">{% for t in timesheets %}<div class="flex justify-between p-3 text-sm"><span>{{t.work_date}} · {{t.project}} · {{t.hours}} h</span>{{ m.badge(t.status) }}</div>{% endfor %}</div>
+<h2 class="mt-6 mb-2 font-medium">My payouts</h2><div class="rounded-lg border bg-white divide-y">{% for p in payouts %}<div class="flex justify-between p-3 text-sm"><span>{{p.amount|money}} (holdback {{p.holdback|money}})</span>{{ m.badge(p.status) }}</div>{% else %}<p class="p-3 text-sm text-slate-500">No payouts yet. They are proposed after the client pays.</p>{% endfor %}</div>{% endif %}
+{% endblock %}

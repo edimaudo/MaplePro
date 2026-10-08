@@ -1,0 +1,6 @@
+<section class="mt-6"><h2 class="font-medium mb-1">Schedule</h2>
+{% if pl.finish %}<p class="text-sm">Forecast finish {{pl.finish}} · baseline {{pl.baseline}} · <b class="{{ 'text-amber-700' if pl.slip else 'text-emerald-700' }}">{{pl.slip}} days behind</b></p>
+<div class="mt-2 rounded-lg border bg-white divide-y text-sm">{% for t in pl.tasks %}<div class="flex flex-wrap gap-2 p-2"><span class="w-44">{{t.name}}</span><span>{{t.es}} to {{t.ef}}</span><span>{{t.progress}}%</span>{% if t.critical %}{{ m.badge('critical path','bg-red-100 text-red-800') }}{% endif %}{% if t.slip %}{{ m.badge('+'~t.slip~' days','bg-amber-100 text-amber-800') }}{% endif %}</div>{% endfor %}</div>
+{% for w in wx %}<p class="mt-2 text-sm text-amber-700">Weather risk: {{w.task}} is scheduled on {{w.dates|join(', ')}} (rain or freezing forecast).</p>{% endfor %}{% endif %}</section>
+<section class="mt-6"><h2 class="font-medium mb-1">Budget vs plan to date</h2><p class="text-sm">{{why}}</p>
+<div class="mt-2 rounded-lg border bg-white divide-y text-sm">{% for l in lines %}<div class="flex justify-between p-2"><span>{{l.category|capitalize}}</span><span>plan {{l.budget|money}} · actual {{l.actual|money}} · <b class="{{ 'text-red-700' if l.var>0 else 'text-emerald-700' }}">{{l.pct}}%</b></span></div>{% endfor %}</div></section>

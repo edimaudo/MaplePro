@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}MaplePro{% endblock %}</title><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-50 text-slate-800 antialiased"><div class="flex min-h-screen">
+{% if u %}{% set staff = u.role in ('admin','staff') %}
+<aside class="w-56 shrink-0 bg-slate-950 text-slate-300 p-4 hidden md:block">
+  <div class="text-white text-lg font-semibold">MaplePro</div><div class="text-xs text-slate-500 mb-6">Decision Intelligence</div>
+  {% set nav=[("/","Command Center" if staff else "My work")] + ([("/finance","Financial Intelligence"),("/timesheets","Timesheets"),("/approvals","Approvals & Audit")] if staff else []) %}
+  {% for href,label in nav %}<a href="{{href}}" class="block rounded-md px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 {{ 'bg-slate-800 text-white' if request.url.path==href else 'hover:bg-slate-900' }}">{{label}}</a>{% endfor %}
+  {% if u.role=='admin' %}<a href="/audit.csv" class="block rounded-md px-3 py-2 text-sm hover:bg-slate-900">Export audit log</a>{% endif %}
+</aside>{% endif %}
+<div class="flex-1 min-w-0">
+  {% if u %}<header class="bg-white border-b px-6 py-3 flex flex-wrap items-center gap-3 text-sm">
+    <form action="/ask" class="flex-1 min-w-[12rem] max-w-md"><label class="sr-only" for="q">Ask MaplePro</label><input id="q" name="q" placeholder="Ask: which invoices are overdue?" class="w-full rounded-md border px-3 py-1.5"></form>
+    <span class="text-xs px-2 py-1 rounded-full {{ 'bg-emerald-100 text-emerald-800' if live else 'bg-amber-100 text-amber-800' }}">PayPal: {{ 'sandbox connected' if live else 'mock mode' }}</span>
+    <span>{{u.name}} ({{u.role}})</span><form method="post" action="/logout"><button class="underline text-blue-700">Sign out</button></form></header>{% endif %}
+  <main class="p-6 max-w-6xl">{% block body %}{% endblock %}</main></div></div></body></html>

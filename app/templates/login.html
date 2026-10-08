@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block body %}
+<form method="post" action="/login" class="mx-auto mt-16 max-w-sm rounded-xl border bg-white p-6 space-y-3">
+  <h1 class="text-xl font-semibold">Sign in to MaplePro</h1>
+  {% if error %}<p role="alert" class="text-sm text-red-700">{{error}}</p>{% endif %}
+  <label class="block text-sm">Email<input name="email" type="email" required class="mt-1 w-full rounded-md border px-3 py-1.5"></label>
+  <label class="block text-sm">Password<input name="password" type="password" required class="mt-1 w-full rounded-md border px-3 py-1.5"></label>
+  <button class="w-full rounded-md bg-blue-600 py-2 text-white hover:bg-blue-700">Sign in</button>
+  <p class="text-xs text-slate-500">Demo users: admin@, pm@ (staff), client@example.com, sub@ (see README).</p></form>{% endblock %}

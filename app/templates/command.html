@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% import "_m.html" as m %}
+{% block body %}
+<h1 class="text-2xl font-semibold">Command Center</h1>
+<section class="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+  <h2 class="font-medium">AI Intelligence Stream</h2>
+  {% for s in stream %}<div class="mt-2 flex gap-2 text-sm">{{ m.badge(s.agent,'bg-white border') }}<span>{{s.text}}</span><span class="ml-auto whitespace-nowrap text-slate-500">heuristic {{s.conf}}%</span></div>
+  {% else %}<p class="mt-2 text-sm text-slate-600">No risks detected.</p>{% endfor %}
+</section>
+<section class="mt-6"><h2 class="font-medium mb-2">Priority intelligence</h2>
+<div class="grid gap-3 md:grid-cols-3">
+  <div class="rounded-lg border bg-white p-4"><div class="text-red-600 font-medium">Urgent ({{urgent|length}})</div>
+    {% for i in urgent %}<p class="mt-2 text-sm"><a class="text-blue-700 underline" href="/finance">{{i.number}}</a> is {{i.days_over}} days overdue ({{i.amount|money}})</p>{% endfor %}</div>
+  <div class="rounded-lg border bg-white p-4"><div class="text-amber-600 font-medium">Today ({{today_n}})</div>
+    <p class="mt-2 text-sm">{{today_n}} agent proposals waiting for approval. <a class="text-blue-700 underline" href="/approvals">Review</a></p></div>
+  <div class="rounded-lg border bg-white p-4"><div class="text-blue-600 font-medium">This week ({{week|length}})</div>
+    {% for w in week %}<p class="mt-2 text-sm">{{w}}</p>{% endfor %}</div>
+</div></section>
+<section class="mt-6"><h2 class="font-medium mb-2">Active projects</h2>
+<div class="grid gap-3 md:grid-cols-3">{% for p in projects %}
+  <a href="/projects/{{p.id}}" class="rounded-lg border bg-white p-4 hover:border-blue-400">
+    <div class="flex justify-between gap-2"><span class="font-medium text-sm">{{p.name}}</span>{{ m.badge(p.health,'bg-amber-100 text-amber-800' if p.health=='watch' else 'bg-emerald-100 text-emerald-800') }}</div>
+    <p class="text-xs text-slate-500">{{p.client}}</p>
+    <div class="mt-3 text-xs">Progress {{p.progress}}%</div><div class="h-2 rounded bg-slate-100"><div class="h-2 rounded bg-blue-600" style="width:{{p.progress}}%"></div></div>
+    <div class="mt-2 text-xs">Budget used {{p.burn}}%</div><div class="h-2 rounded bg-slate-100"><div class="h-2 rounded {{ 'bg-amber-500' if p.gap>=8 else 'bg-emerald-500' }}" style="width:{{p.burn}}%"></div></div>
+    {% if p.overdue %}<p class="mt-2 text-xs text-red-600">{{p.overdue|money}} overdue</p>{% endif %}
+  </a>{% endfor %}</div></section>
+{% if pending %}<section class="mt-6"><h2 class="font-medium mb-2">Waiting for your approval</h2><div class="space-y-3">{% for a in pending %}{{ m.card(a) }}{% endfor %}</div></section>{% endif %}
+<section class="mt-6 grid gap-3 md:grid-cols-3">
+  {% for label,v in [("Contract value",contract|money),("Spent to date",spent|money),("Overdue receivables",overdue_total|money)] %}
+  <div class="rounded-lg border bg-white p-4"><div class="text-xs text-slate-500">{{label}}</div><div class="text-xl font-semibold">{{v}}</div></div>{% endfor %}
+</section>
+{% endblock %}

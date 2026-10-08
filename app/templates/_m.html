@@ -1,0 +1,13 @@
+{% macro badge(t,c='bg-slate-100 text-slate-700') %}<span class="text-xs px-2 py-0.5 rounded-full {{c}}">{{t}}</span>{% endmacro %}
+{% macro card(a) %}
+<div class="rounded-lg border bg-white p-4">
+  <div class="flex items-center gap-2">{{ badge(a.agent,'bg-indigo-100 text-indigo-800') }}<span class="font-medium text-sm">{{a.title}}</span>
+    {% if a.status!='pending' %}<span class="ml-auto">{{ badge(a.status,'bg-emerald-100 text-emerald-800' if a.status=='executed' else 'bg-slate-200 text-slate-700') }}</span>{% endif %}</div>
+  {% if a.p.note %}<p class="mt-2 text-sm text-slate-600">"{{a.p.note}}"</p>{% endif %}
+  {% if a.p.amount %}<p class="mt-2 text-sm text-slate-600">Amount {{a.p.amount|money}}, holdback {{a.p.holdback|money}}</p>{% endif %}
+  <details class="mt-2 text-xs text-slate-500"><summary class="cursor-pointer">Why did the agent propose this?</summary><p class="mt-1">{{a.rationale}}</p>{% if a.result %}<p class="mt-1 break-all">Result: {{a.result}}</p>{% endif %}</details>
+  {% if a.status=='pending' %}<div class="mt-3 flex gap-2">
+    <form method="post" action="/actions/{{a.id}}/approve"><button class="rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700">Approve and send via PayPal</button></form>
+    <form method="post" action="/actions/{{a.id}}/reject"><button class="rounded-md border px-3 py-1.5 text-sm hover:bg-slate-50">Reject</button></form></div>{% endif %}
+</div>
+{% endmacro %}

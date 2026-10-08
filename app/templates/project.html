@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% import "_m.html" as m %}
+{% block body %}
+<a href="/" class="text-sm text-blue-700 underline">Back</a>
+<h1 class="mt-2 text-2xl font-semibold">{{p.name}}</h1><p class="text-sm text-slate-600">{{p.client}} · due {{p.due}}</p>
+<p class="mt-2 max-w-2xl text-sm">{{p.description}}</p>
+<div class="mt-3 text-sm">Budget {{p.budget|money}} · spent {{p.spent|money}} · progress {{p.progress}}%</div>
+{% if true %}{% include "_proj_extra.html" %}
+<section class="mt-6"><h2 class="font-medium mb-2">New daily report</h2>
+<form method="post" action="/projects/{{p.id}}/report" class="max-w-2xl">
+  <label for="raw" class="text-sm">Field note (typed or pasted)</label>
+  <textarea id="raw" name="raw" required rows="4" class="mt-1 w-full rounded-md border p-2 text-sm" placeholder="Framing complete on levels 3 to 5. Crew of 12. One wall failed inspection and was rebuilt."></textarea>
+  <button class="mt-2 rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700">Analyze with Site Agent</button>
+</form></section>{% endif %}
+<section class="mt-6"><h2 class="font-medium mb-2">Reports</h2><div class="space-y-3">
+{% for r in reports %}{% set s=r.s %}
+<div class="rounded-lg border bg-white p-4 text-sm">
+  <div class="flex gap-2 text-xs text-slate-500">{{r.created}} {{ m.badge('structured by '~s.source) }}</div>
+  <p class="mt-2 italic text-slate-600">"{{r.raw}}"</p>
+  {% if s.work_completed %}<p class="mt-2"><b>Work completed:</b> {{s.work_completed|join('; ')}}</p>{% endif %}
+  {% for d in s.delays %}<p class="mt-1 text-amber-700"><b>Delay:</b> {{d.cause}}{% if d.tasks_affected %} (affects {{d.tasks_affected|join(', ')}}){% endif %}</p>{% endfor %}
+  {% for i in s.impacts %}<p class="mt-1 text-indigo-700">{{i}}</p>{% endfor %}
+  {% if s.risks %}<p class="mt-1"><b>Risks:</b> {{s.risks|join('; ')}}</p>{% endif %}
+  {% if s.milestone_complete %}<p class="mt-1 text-emerald-700">Milestone complete: {{s.milestone_name}}. Billing Agent drafted an invoice for <a class="underline" href="/approvals">your approval</a>.</p>{% endif %}
+  {% if s.follow_up_question %}<p class="mt-1 text-blue-700"><b>Agent asks:</b> {{s.follow_up_question}}</p>{% endif %}
+</div>{% else %}<p class="text-sm text-slate-500">No reports yet. Submit a field note above.</p>{% endfor %}</div></section>
+{% endblock %}
