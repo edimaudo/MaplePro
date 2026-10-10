@@ -20,7 +20,7 @@ async def lifespan(app):
     yield
 app = FastAPI(title="MaplePro", lifespan=lifespan)
 _secret = os.getenv("SECRET_KEY")
-if not _secret and (paypal.live() or os.getenv("VERCEL")): raise RuntimeError("Set SECRET_KEY")
+if not _secret and paypal.live(): raise RuntimeError("Set SECRET_KEY before connecting live PayPal")  # demo mode may boot without it
 app.add_middleware(SessionMiddleware, secret_key=_secret or "dev-only-secret", same_site="lax",
                    https_only=os.getenv("COOKIE_SECURE") == "1")
 T = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
