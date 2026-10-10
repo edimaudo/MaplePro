@@ -1,5 +1,7 @@
-import sqlite3, datetime as dt, os, hashlib, secrets
-DB = os.getenv("MAPLEPRO_DB", "maplepro.db")
+import sqlite3, re, json, hmac, contextvars, datetime as dt, os, hashlib, secrets
+URL = os.getenv("DATABASE_URL")  # Postgres when set
+STORAGE = "postgres" if URL else os.getenv("STORAGE", "browser")  # browser (localStorage) | file (SQLite) | postgres
+DB = os.getenv("MAPLEPRO_DB") or ("/tmp/maplepro.db" if os.getenv("VERCEL") else "maplepro.db")  # /tmp is the only writable, and ephemeral, path on Vercel
 SCHEMA = """
 create table if not exists clients(id integer primary key, name text, email text);
 create table if not exists projects(id integer primary key, name text, client_id int, status text,
@@ -24,11 +26,81 @@ def hash_pw(p):
 def check_pw(p, h):
     salt, dk = h.split(":"); return secrets.compare_digest(hashlib.pbkdf2_hmac("sha256", p.encode(), bytes.fromhex(salt), 200_000).hex(), dk)
 
-def conn():
+def to_pg(sql, schema=False):
+    sql = sql.replace("?", "%s")
+    return re.sub(r"\breal\b", "double precision", sql.replace("integer primary key", "serial primary key")) if schema else sql
+
+class Row(dict):  # supports row["col"], row[0] and dict(row), like sqlite3.Row
+    def __getitem__(self, k): return list(self.values())[k] if isinstance(k, int) else super().__getitem__(k)
+
+class _R:
+    def __init__(s, cur, last=None): s.cur, s.lastrowid = cur, last
+    def fetchone(s): return s.cur.fetchone()
+    def fetchall(s): return s.cur.fetchall()
+    def __iter__(s): return iter(s.cur.fetchall())
+
+class PG:
+    """Minimal sqlite3-style adapter over psycopg so the app code is identical on both backends."""
+    def __init__(s, url):
+        import psycopg
+        s.c = psycopg.connect(url, row_factory=lambda cur: (lambda v, n=[d.name for d in (cur.description or [])]: Row(zip(n, v))))
+    def execute(s, sql, a=()):
+        sql = to_pg(sql); m = re.match(r"\s*insert into (\w+)", sql, re.I)
+        ret = bool(m) and m.group(1) != "members" and "returning" not in sql.lower()
+        cur = s.c.execute(sql + (" returning id" if ret else ""), a)
+        return _R(cur, cur.fetchone()["id"] if ret else None)
+    def executemany(s, sql, seq): s.c.cursor().executemany(to_pg(sql), seq)
+    def executescript(s, sql):
+        for st in filter(str.strip, to_pg(sql, True).split(";")): s.c.execute(st)
+    def commit(s): s.c.commit()
+    def rollback(s): s.c.rollback()
+    def close(s): s.c.close()
+
+IntegrityError = (sqlite3.IntegrityError,) + ((__import__("psycopg").IntegrityError,) if URL else ())
+_ready = False
+MEM = contextvars.ContextVar("mem", default=None)  # per-request in-memory DB (browser storage mode)
+TABLES = ["clients", "projects", "invoices", "reports", "actions", "webhook_events", "users", "members", "tasks", "timesheets", "payouts", "budget_lines"]
+_KEY = lambda: (os.getenv("SECRET_KEY") or "dev-only-secret").encode()
+
+class Keep:  # shared per-request connection whose close() is a no-op
+    def __init__(s, c): s.c = c
+    def __getattr__(s, k): return getattr(s.c, k)
+    def close(s): pass
+
+def mem_open(state):
+    c = sqlite3.connect(":memory:", check_same_thread=False); c.row_factory = sqlite3.Row; c.executescript(SCHEMA + SCHEMA2)
+    if state:
+        for t, (cols, rows) in state.items():
+            if t in TABLES and rows and all(re.fullmatch(r"\w+", x) for x in cols):
+                c.executemany(f"insert into {t}({','.join(cols)}) values({','.join('?' * len(cols))})", rows)
+    else: seed(c); seed2(c)
+    return c
+
+def dump(c):  # JSON text of every table; the browser stores it verbatim
+    out = {}
+    for t in TABLES:
+        cur = c.execute(f"select * from {t}"); out[t] = [[d[0] for d in cur.description], [list(r) for r in cur.fetchall()]]
+    return json.dumps(out, separators=(",", ":"))
+
+sign = lambda text: hmac.new(_KEY(), text.encode(), "sha256").hexdigest()
+verify = lambda sig, text: hmac.compare_digest(sig or "", sign(text))
+
+def _open():
+    if MEM.get() is not None: return MEM.get()
+    if URL: return PG(URL)
+    if STORAGE == "browser": raise RuntimeError("Browser storage mode: no state loaded for this request")
     c = sqlite3.connect(DB); c.row_factory = sqlite3.Row; return c
 
+def conn():
+    global _ready
+    if STORAGE != "browser" and not _ready:  # serverless runtimes may skip the ASGI lifespan
+        _ready = True
+        try: init()
+        except Exception: _ready = False; raise
+    return _open()
+
 def init():
-    c = conn(); c.executescript(SCHEMA + SCHEMA2)
+    c = _open(); c.executescript(SCHEMA + SCHEMA2)
     if not c.execute("select count(*) from projects").fetchone()[0]: seed(c); seed2(c)
     c.commit(); c.close()
 

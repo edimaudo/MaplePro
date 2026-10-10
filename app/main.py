@@ -1,9 +1,10 @@
-import json, os, csv, io, sqlite3, datetime as dt
+import json, os, csv, io, html, sqlite3, datetime as dt
+import httpx
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import RedirectResponse, Response, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from . import db, agents, paypal, sched
@@ -14,17 +15,19 @@ RATE = lambda: float(os.getenv("LABOR_RATE", "65"))
 HOLDBACK = 0.10  # default holdback; verify statutory rules before relying on it
 
 @asynccontextmanager
-async def lifespan(app): db.init(); yield
+async def lifespan(app):
+    if db.STORAGE != "browser": db.conn().close()
+    yield
 app = FastAPI(title="MaplePro", lifespan=lifespan)
 _secret = os.getenv("SECRET_KEY")
-if not _secret and paypal.live(): raise RuntimeError("Set SECRET_KEY before connecting PayPal")
+if not _secret and (paypal.live() or os.getenv("VERCEL")): raise RuntimeError("Set SECRET_KEY")
 app.add_middleware(SessionMiddleware, secret_key=_secret or "dev-only-secret", same_site="lax",
                    https_only=os.getenv("COOKIE_SECURE") == "1")
 T = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 T.env.filters["money"] = lambda v: f"${v:,.0f}" if v is not None else "-"
 now = lambda: dt.datetime.now().isoformat(timespec="seconds")
 go = lambda url: RedirectResponse(url, status_code=303)
-def page(req, name, u, **ctx): return T.TemplateResponse(req, name, {"live": paypal.live(), "u": u, **ctx})
+def page(req, name, u, **ctx): return T.TemplateResponse(req, name, {"live": paypal.live(), "u": u, "storage": db.STORAGE, **ctx})
 
 # ---- auth & scoping -------------------------------------------------------------
 class Login(Exception): pass
@@ -48,13 +51,13 @@ def pids(c, u):
     return [r["id"] for r in c.execute(q, a)]
 
 @app.get("/login")
-def login_form(req: Request): return T.TemplateResponse(req, "login.html", {"error": None, "u": None, "live": paypal.live()})
+def login_form(req: Request): return T.TemplateResponse(req, "login.html", {"error": None, "u": None, "live": paypal.live(), "storage": db.STORAGE})
 
 @app.post("/login")
 def login(req: Request, email: str = Form(...), password: str = Form(...)):
     c = db.conn(); r = c.execute("select * from users where email=?", (email.strip().lower(),)).fetchone(); c.close()
     if not r or not db.check_pw(password, r["pw"]):
-        return T.TemplateResponse(req, "login.html", {"error": "Email or password is incorrect.", "u": None, "live": paypal.live()}, status_code=401)
+        return T.TemplateResponse(req, "login.html", {"error": "Email or password is incorrect.", "u": None, "live": paypal.live(), "storage": db.STORAGE}, status_code=401)
     req.session.clear(); req.session["uid"] = r["id"]; return go("/")
 
 @app.post("/logout")
@@ -273,11 +276,12 @@ PAY_BAD = {"PAYMENT.PAYOUTS-ITEM.FAILED", "PAYMENT.PAYOUTS-ITEM.RETURNED", "PAYM
 
 @app.post("/webhooks/paypal")
 async def webhook(req: Request):
+    if db.STORAGE == "browser": raise HTTPException(503, "Webhooks need DATABASE_URL; browser storage mode uses Sync payments")
     raw = await req.body(); ev = json.loads(raw)
     if not paypal.verify_webhook(req.headers, ev): raise HTTPException(400, "invalid signature")
     c = db.conn(); t = ev["event_type"]; res = ev.get("resource", {})
     try: c.execute("insert into webhook_events(event_id,type,payload,created) values(?,?,?,?)", (ev["id"], t, raw.decode(), now()))
-    except sqlite3.IntegrityError: return {"status": "duplicate"}  # PayPal retries are safe
+    except db.IntegrityError: c.rollback(); c.close(); return {"status": "duplicate"}  # PayPal retries are safe
     if t in INV:
         pid = (res.get("invoice") or res).get("id"); row = c.execute("select id,status from invoices where paypal_id=?", (pid,)).fetchone()
         if row and row["status"] != INV[t]:
@@ -289,3 +293,58 @@ async def webhook(req: Request):
             if t in PAY_OK: c.execute("update payouts set status='paid' where id=?", (po["id"],)); c.execute("update timesheets set status='paid' where payout_id=?", (po["id"],))
             else: release(c, po["id"], "failed")
     c.commit(); c.close(); return {"status": "ok"}
+
+# ---- sync (polling; works without webhooks) -----------------------------------------------------
+@app.post("/sync")
+def sync(req: Request):
+    u = me(req); need(u, "admin", "staff"); c = db.conn()
+    for i in agents.rows(c, "select id, paypal_id from invoices where status='sent' and paypal_id is not null"):
+        if i["paypal_id"].startswith("MOCK-"): continue
+        try: st = paypal.invoice_status(i["paypal_id"])
+        except Exception: continue
+        if st:
+            c.execute("update invoices set status=? where id=?", (st, i["id"]))
+            if st == "paid": on_paid(c, i["id"])
+    for po in agents.rows(c, "select id, batch_id from payouts where status='processing'"):
+        try: st = paypal.payout_status(po["batch_id"])
+        except Exception: continue
+        if st == "paid": c.execute("update payouts set status='paid' where id=?", (po["id"],)); c.execute("update timesheets set status='paid' where payout_id=?", (po["id"],))
+        elif st == "failed": release(c, po["id"], "failed")
+    c.commit(); c.close(); return go("/finance")
+
+# ---- browser storage mode: the browser keeps the data (localStorage); the server stays stateless -------
+@app.middleware("http")
+async def shell(req: Request, call_next):
+    if db.STORAGE == "browser" and req.url.path not in ("/__rpc", "/__shim.js", "/webhooks/paypal") and not req.headers.get("x-mp-inner"):
+        if req.method == "GET":
+            return HTMLResponse('<!doctype html><html data-shell lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MaplePro</title></head>'
+                                '<body><p style="font:14px sans-serif;padding:2rem">Loading...</p><script src="/__shim.js"></script></body></html>')
+        return Response("Use the app interface", status_code=405)
+    return await call_next(req)
+
+@app.get("/__shim.js")
+def shim(): return Response(open(os.path.join(os.path.dirname(__file__), "templates", "shim.js")).read(), media_type="text/javascript")
+
+@app.post("/__rpc")
+async def rpc(req: Request):
+    """Run a normal app request against the state the browser sent, and return the HTML plus the new state."""
+    if db.STORAGE != "browser": raise HTTPException(404)
+    b = await req.json(); url = b.get("url", "")
+    if not url.startswith("/") or url.startswith("//") or url.split("?")[0] in ("/__rpc", "/__shim.js") or url.startswith("/webhooks"): raise HTTPException(400, "bad url")
+    text = b.get("state")
+    if text and not db.verify(b.get("sig", ""), text): raise HTTPException(400, "Saved data failed verification")
+    mem = db.mem_open(json.loads(text) if text else None); tok = db.MEM.set(db.Keep(mem))
+    try:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://app") as cl:
+            r = await cl.request(b.get("method", "GET"), url, data=b.get("form") or None, headers={"cookie": b.get("cookie", ""), "x-mp-inner": "1"})
+        new = db.dump(mem)
+    finally: db.MEM.reset(tok); mem.close()
+    jar = dict(x.split("=", 1) for x in b.get("cookie", "").split("; ") if "=" in x)
+    for sc in r.headers.get_list("set-cookie"): k, v = sc.split(";")[0].split("=", 1); jar[k] = v
+    out = {"state": new, "sig": db.sign(new), "cookie": "; ".join(f"{k}={v}" for k, v in jar.items())}
+    ct = r.headers.get("content-type", "")
+    if r.status_code in (301, 302, 303, 307): out["location"] = r.headers["location"]
+    elif r.status_code >= 400: out["html"] = f'<p style="font:14px sans-serif;padding:2rem">Error {r.status_code}: {html.escape(r.text[:300])} <a href="/" style="color:#1d4ed8">Home</a></p>'
+    elif ct.startswith("text/html"): out["html"] = r.text
+    else: out.update(text=r.text, ctype=ct, filename="audit.csv")
+    return out

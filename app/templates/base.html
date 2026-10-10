@@ -12,5 +12,5 @@
   {% if u %}<header class="bg-white border-b px-6 py-3 flex flex-wrap items-center gap-3 text-sm">
     <form action="/ask" class="flex-1 min-w-[12rem] max-w-md"><label class="sr-only" for="q">Ask MaplePro</label><input id="q" name="q" placeholder="Ask: which invoices are overdue?" class="w-full rounded-md border px-3 py-1.5"></form>
     <span class="text-xs px-2 py-1 rounded-full {{ 'bg-emerald-100 text-emerald-800' if live else 'bg-amber-100 text-amber-800' }}">PayPal: {{ 'sandbox connected' if live else 'mock mode' }}</span>
-    <span>{{u.name}} ({{u.role}})</span><form method="post" action="/logout"><button class="underline text-blue-700">Sign out</button></form></header>{% endif %}
-  <main class="p-6 max-w-6xl">{% block body %}{% endblock %}</main></div></div></body></html>
+    {% if storage=='browser' %}<button type="button" onclick="mpReset()" class="text-xs underline text-slate-500">Reset local data</button>{% endif %}<span>{{u.name}} ({{u.role}})</span><form method="post" action="/logout"><button class="underline text-blue-700">Sign out</button></form></header>{% endif %}
+  <main class="p-6 max-w-6xl">{% block body %}{% endblock %}</main></div></div>{% if storage=='browser' %}<script src="/__shim.js"></script>{% endif %}</body></html>

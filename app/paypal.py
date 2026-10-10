@@ -67,3 +67,13 @@ def balance():
     if not live(): return None
     try: return float(_req("GET", f"/v1/reporting/balances?currency_code={CUR()}").json()["balances"][0]["available_balance"]["value"])
     except Exception: return None
+
+def invoice_status(pid):
+    if not live(): return None
+    s = _req("GET", f"/v2/invoicing/invoices/{pid}").json().get("status", "")
+    return {"PAID": "paid", "MARKED_AS_PAID": "paid", "CANCELLED": "cancelled", "REFUNDED": "refunded"}.get(s)
+
+def payout_status(batch):
+    if not live(): return None
+    s = _req("GET", f"/v1/payments/payouts/{batch}").json()["batch_header"]["batch_status"]
+    return {"SUCCESS": "paid", "DENIED": "failed", "CANCELED": "failed"}.get(s)

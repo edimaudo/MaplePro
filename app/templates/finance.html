@@ -1,6 +1,7 @@
 {% extends "base.html" %}{% import "_m.html" as m %}
 {% block body %}
 <h1 class="text-2xl font-semibold">Financial Intelligence</h1>
+{% if live %}<form method="post" action="/sync" class="mt-2"><button class="rounded-md border px-3 py-1.5 text-sm hover:bg-slate-50">Sync payments from PayPal</button></form>{% endif %}
 <div class="mt-4 grid gap-3 md:grid-cols-3">
   <div class="rounded-lg border bg-red-50 p-4"><div class="text-xs text-slate-500">Overdue</div><div class="text-xl font-semibold">{{total|money}}</div></div>
   <div class="rounded-lg border bg-white p-4"><div class="text-xs text-slate-500">High-risk invoices</div><div class="text-xl font-semibold">{{high|length}}</div></div>

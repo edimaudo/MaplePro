@@ -2,6 +2,7 @@ import os, datetime as dt
 DB = "/tmp/maplepro_test.db"
 if os.path.exists(DB): os.remove(DB)
 os.environ["MAPLEPRO_DB"] = DB
+os.environ["STORAGE"] = "file"
 for k in ("GEMINI_API_KEY", "PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"): os.environ.pop(k, None)
 import pytest
 from fastapi.testclient import TestClient
@@ -68,3 +69,23 @@ def test_webhook_rejects_unsigned_then_dedupes(admin, monkeypatch):
     c = TestClient(app)
     assert c.post("/webhooks/paypal", json=ev).json()["status"] == "ok"
     assert c.post("/webhooks/paypal", json=ev).json()["status"] == "duplicate"
+
+def test_postgres_sql_translation():
+    from app import db
+    assert db.to_pg("select * from t where a=? and b=?") == "select * from t where a=%s and b=%s"
+    out = db.to_pg("create table x(id integer primary key, v real)", schema=True)
+    assert "serial primary key" in out and "double precision" in out and "real" not in out
+
+def test_browser_storage_roundtrip(monkeypatch):
+    from app import db
+    monkeypatch.setattr(db, "STORAGE", "browser")
+    t = TestClient(app); assert "data-shell" in t.get("/").text  # direct navigation gets the loader shell
+    def rpc(method, url, s=None, form=None):
+        s = s or {}; return t.post("/__rpc", json={"method": method, "url": url, "form": form, "state": s.get("state"), "sig": s.get("sig", ""), "cookie": s.get("cookie", "")})
+    r = rpc("GET", "/login").json(); assert "Sign in" in r["html"]
+    r = rpc("POST", "/login", r, {"email": ["admin@maplepro.test"], "password": ["maple123"]}).json(); assert r["location"] == "/"
+    f = rpc("GET", "/finance", r).json(); assert "INV-2026-008" in f["html"]
+    f2 = rpc("POST", "/invoices/1/draft", f).json()  # a write: state must change and persist
+    assert f2["state"] != f["state"] and "Send reminder for INV-2026-008" in rpc("GET", "/approvals", f2).json()["html"]
+    assert rpc("GET", "/finance", {**f, "state": f["state"].replace("Acme", "Evil")}).status_code == 400  # tampering rejected
+    assert rpc("GET", "/finance", {"cookie": ""}).json()["location"] == "/login"  # no session
