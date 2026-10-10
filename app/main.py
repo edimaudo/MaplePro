@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse, Response, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from . import db, agents, paypal, sched
+from .shim import JS
 
 STAFF_LIMIT = lambda: float(os.getenv("STAFF_APPROVAL_LIMIT", "50000"))
 AUTO = lambda: set(os.getenv("AUTO_KINDS", "remind").split(","))  # low-stakes kinds that run without approval
@@ -318,12 +319,14 @@ async def shell(req: Request, call_next):
     if db.STORAGE == "browser" and req.url.path not in ("/__rpc", "/__shim.js", "/webhooks/paypal") and not req.headers.get("x-mp-inner"):
         if req.method == "GET":
             return HTMLResponse('<!doctype html><html data-shell lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MaplePro</title></head>'
-                                '<body><p style="font:14px sans-serif;padding:2rem">Loading...</p><script src="/__shim.js"></script></body></html>')
+                                '<body><p id="mp-load" style="font:14px sans-serif;padding:2rem">Loading...</p><noscript>JavaScript is required.</noscript>'
+                                '<script>' + JS + '</script>'
+                                '<script>setTimeout(function(){var p=document.getElementById("mp-load");if(p)p.innerHTML="Still loading. <a href=\'/__shim.js\'>Check the script</a> or <a href=\'#\' onclick=\'mpReset()\'>reset local data</a>."},8000)</script></body></html>')
         return Response("Use the app interface", status_code=405)
     return await call_next(req)
 
 @app.get("/__shim.js")
-def shim(): return Response(open(os.path.join(os.path.dirname(__file__), "templates", "shim.js")).read(), media_type="text/javascript")
+def shim(): return Response(JS, media_type="text/javascript")
 
 @app.post("/__rpc")
 async def rpc(req: Request):
