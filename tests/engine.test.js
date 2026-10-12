@@ -1,0 +1,12 @@
+const test = require("node:test"), assert = require("node:assert"), E = require("../public/engine.js");
+const t = (id, days, pred, slip = 0) => ({ id, days, pred, slip, start: "2026-01-01", progress: 0, wx: 0, name: "t" + id });
+test("critical path and slip", () => { const p = E.plan([t(1, 5, null), t(2, 3, 1, 2)]); assert.equal(p.slip, 2); assert.ok(p.tasks.every(x => x.critical)); });
+test("parallel task is not critical", () => { const p = E.plan([t(1, 5, null), t(2, 10, 1), t(3, 2, 1)]); assert.equal(p.tasks.find(x => x.id === 3).critical, false); });
+test("grounding rejects invented numbers", () => { assert.ok(E.grounded("Invoice 12 is $5,000 late", ["12", "$5,000"])); assert.ok(!E.grounded("Invoice 12 is $9,999 late", ["12", "$5,000"])); });
+test("normalize survives bad LLM output", () => { const o = E.normalize({ delays: "oops", delay_days: -3, work_completed: [1, "ok"] }, "gemini"); assert.deepEqual(o.delays, []); assert.equal(o.delay_days, null); assert.deepEqual(o.work_completed, ["ok"]); });
+test("site fallback finds milestone and delay", () => { assert.equal(E.siteFallback("Foundation is complete. Crew of 8.").milestone_name, "Foundation");
+  const s = E.siteFallback("Rain caused a 3 day delay to Framing. 10 overtime hours."); assert.equal(s.delay_days, 3); assert.equal(s.extra_hours, 10); assert.deepEqual(s.delays[0].tasks_affected, ["framing"]); });
+test("holdback split", () => { const r = E.holdbackSplit(4940, 0.1); assert.equal(r.hold, 494); assert.equal(r.net, 4446); });
+test("variance and weather risk", () => { assert.equal(E.variance([{ budget: 100, actual: 130 }])[0].pct, 30);
+  const tk = { ...E.plan([{ ...t(1, 3, null), wx: 1 }]).tasks[0] }; assert.equal(E.wxRisks([tk], [{ date: "2026-01-02", rain: 9, tmin: 3 }, { date: "2026-02-01", rain: 9, tmin: 3 }])[0].dates.length, 1); });
+test("payment probability", () => { assert.equal(E.payProb(0, 1000), 92); assert.equal(E.payProb(27, 250500), 41); });
