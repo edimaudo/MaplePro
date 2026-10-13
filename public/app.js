@@ -139,11 +139,30 @@ function layout(body) {
     <main class="p-6 max-w-6xl">${body}</main></div></div>`; }
 
 const V = {};
-V.login = () => `<form data-form="login" class="mx-auto mt-16 max-w-sm rounded-xl border bg-white p-6 space-y-3"><h1 class="text-xl font-semibold">Sign in to MaplePro</h1>
-  <label class="block text-sm">Email<input name="email" type="email" required class="mt-1 w-full rounded-md border px-3 py-1.5"></label>
-  <label class="block text-sm">Password<input name="password" type="password" required class="mt-1 w-full rounded-md border px-3 py-1.5"></label>
-  <button class="w-full rounded-md bg-blue-600 py-2 text-white hover:bg-blue-700">Sign in</button>
-  <p class="text-xs text-slate-500">Demo users (password maple123): admin@maplepro.test, pm@maplepro.test, client@example.com, sub@maplepro.test. Data stays in this browser; roles here are for the demo, not security.</p></form>`;
+const accounts = () => [["Admin", "admin", "Everything: all approvals, Settings, audit export"], ["Project manager", "staff", `Command Center; approves up to ${money(CFG.staffLimit)}`],
+  ["Client", "client", "Own projects and invoices only"], ["Subcontractor", "subcontractor", "Timesheets and payouts only"]].map(([label, role, desc]) => ({ label, desc, email: S.users.find(u => u.role === role).email }));
+const acctTable = () => `<div class="overflow-x-auto rounded-xl border bg-white"><table class="w-full text-sm"><thead class="bg-slate-50 text-left text-xs text-slate-500"><tr><th class="p-3">Role</th><th class="p-3">Email</th><th class="p-3">Password</th><th class="p-3 hidden md:table-cell">What they can see</th><th></th></tr></thead>
+  <tbody class="divide-y">${accounts().map(a => `<tr><td class="p-3 font-medium whitespace-nowrap">${a.label}</td><td class="p-3 font-mono">${esc(a.email)}</td><td class="p-3 font-mono">maple123</td><td class="p-3 hidden md:table-cell text-slate-600">${a.desc}</td>
+  <td class="p-3 text-right whitespace-nowrap"><button data-act="demo" data-email="${esc(a.email)}" class="rounded-md bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700">Sign in as ${a.label.toLowerCase()}</button></td></tr>`).join("")}</tbody></table></div>`;
+
+V.landing = () => `<div class="min-h-screen bg-slate-50"><header class="bg-slate-950 text-white"><div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4"><span class="text-lg font-semibold">MaplePro</span>
+  <a href="#/login" class="rounded-md border border-slate-600 px-3 py-1.5 text-sm hover:bg-slate-800">Sign in</a></div>
+  <div class="mx-auto max-w-6xl px-6 pb-16 pt-12"><p class="text-sm text-blue-300">Construction management, run by AI agents</p>
+  <h1 class="mt-3 max-w-3xl text-4xl font-semibold leading-tight">Turn a messy field note into a schedule update, a cost update and a paid invoice.</h1>
+  <p class="mt-4 max-w-2xl text-slate-300">MaplePro's agents read daily reports, forecast delays and budget overruns, and prepare invoices and subcontractor payouts. You approve every move of money, and PayPal does the payment.</p>
+  <div class="mt-8 flex flex-wrap gap-3"><a href="#demo" data-act="scroll" class="rounded-md bg-blue-600 px-5 py-2.5 font-medium hover:bg-blue-500">Try the demo</a><a href="#/login" class="rounded-md border border-slate-600 px-5 py-2.5 hover:bg-slate-800">Sign in</a></div></div></header>
+  <main class="mx-auto max-w-6xl space-y-14 px-6 py-12">
+  <section><h2 class="text-xl font-semibold">What it does</h2><div class="mt-4 grid gap-4 md:grid-cols-3">
+  ${[["Reads the site", "Paste a field note. The Site Agent pulls out work done, delays, risks and milestones, and asks when something is missing."], ["Sees the consequences", "Delays move the critical path and finish date, weather is checked, and overtime shows up as budget variance, explained in plain language."], ["Moves the money, with you in control", "Milestones become PayPal invoices, client payments trigger subcontractor payouts with holdback, and big actions need an admin."]]
+  .map(([t, d]) => `<div class="rounded-xl border bg-white p-5"><h3 class="font-medium">${t}</h3><p class="mt-2 text-sm text-slate-600">${d}</p></div>`).join("")}</div></section>
+  <section><h2 class="text-xl font-semibold">How a project event flows</h2><ol class="mt-4 grid gap-3 text-sm md:grid-cols-5">${["Field note", "Agents analyse", "Schedule and budget update", "You approve", "PayPal invoice or payout"]
+  .map((t, i) => `<li class="rounded-lg border bg-white p-4"><span class="text-xs text-blue-700">Step ${i + 1}</span><div class="mt-1 font-medium">${t}</div></li>`).join("")}</ol></section>
+  <section id="demo"><h2 class="text-xl font-semibold">Try the demo</h2><p class="mt-1 text-sm text-slate-600">Four demo accounts, all with the password <span class="font-mono">maple123</span>. Click a button to sign in as that role. Data is fake and stays in this browser; PayPal runs in sandbox or mock mode.</p><div class="mt-4">${acctTable()}</div></section></main></div>`;
+
+V.login = () => `<div class="mx-auto max-w-3xl px-6 py-10"><a href="#/" class="text-sm text-blue-700 underline">Back to home</a><h1 class="mt-3 text-2xl font-semibold">Sign in to MaplePro</h1>
+  <form data-form="login" class="mt-4 max-w-sm space-y-3 rounded-xl border bg-white p-6"><label class="block text-sm">Email<input name="email" type="email" required autocomplete="username" class="mt-1 w-full rounded-md border px-3 py-1.5"></label>
+  <label class="block text-sm">Password<input name="password" type="password" required autocomplete="current-password" class="mt-1 w-full rounded-md border px-3 py-1.5"></label><button class="w-full rounded-md bg-blue-600 py-2 text-white hover:bg-blue-700">Sign in</button></form>
+  <h2 class="mt-8 mb-2 font-medium">Demo accounts</h2><p class="mb-3 text-sm text-slate-600">Use these exact emails with the password <span class="font-mono">maple123</span>, or click a button.</p>${acctTable()}</div>`;
 
 V.command = () => { const all = invs(), od = all.filter(i => i.days_over > 0), projs = S.projects.map(p => { const burn = Math.round(p.spent / p.budget * 100); return { ...p, burn, gap: burn - p.progress, client: cl(p.client_id).name, overdue: od.filter(i => i.project_id == p.id).reduce((s, i) => s + i.amount, 0) }; });
   const stream = projs.filter(p => p.gap >= 8).map(p => ({ a: "Budget", t: `${p.name}: ${p.burn}% of budget spent against ${p.progress}% progress.`, c: Math.min(95, 55 + p.gap * 2) }));
@@ -225,7 +244,7 @@ V.ask = async q => { const route = await gem(`Pick one tool for this constructio
 
 async function render() {
   const app = document.getElementById("app");
-  if (!ME) { app.innerHTML = V.login(); return; }
+  if (!ME) { app.innerHTML = location.hash === "#/login" ? V.login() : V.landing(); return; }
   const [path, qs] = (location.hash.slice(1) || "/").split("?"), seg = path.split("/").filter(Boolean); let body;
   try {
     if (!seg.length) body = staff() ? V.command() : V.portal();
@@ -247,6 +266,8 @@ const ACT = {
     if (CFG.autoKinds.includes("remind")) await run(a, "auto (low-stakes tier)"); location.hash = "#/approvals"; },
   simpaid(d) { upd("invoices", +d.id, { status: "paid" }); onPaid(+d.id); location.hash = "#/approvals"; },
   tsapprove(d) { upd("timesheets", +d.id, { status: "approved" }); },
+  demo(d) { FORM.login({ email: d.email, password: "maple123" }); },
+  scroll() { document.getElementById("demo").scrollIntoView({ behavior: "smooth" }); },
   sync, logout() { ME = null; put("meta", { id: 3, uid: null }); location.hash = "#/"; },
   reset() { if (!confirm("Delete all local MaplePro data?")) return; idb.close(); indexedDB.deleteDatabase("maplepro").onsuccess = () => { location.hash = "#/"; location.reload(); }; },
   csv() { const rows = [["id", "created", "agent", "kind", "title", "rationale", "status", "result", "decided"], ...S.actions.map(a => [a.id, a.created, a.agent, a.kind, a.title, a.rationale, a.status, JSON.stringify(a.result), a.decided])];

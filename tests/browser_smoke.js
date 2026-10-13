@@ -13,8 +13,8 @@ const form = (name, vals) => { const f = D.querySelector(`[data-form="${name}"]`
 const click = sel => D.querySelector(sel).dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }));
 const go = async h => { w.location.hash = h; await sleep(150); };
 (async () => {
-  await sleep(300); ok(html().includes("Sign in"), "login screen");
-  form("login", { email: "pm@maplepro.test", password: "nope" }); await sleep(100); ok(html().includes("Sign in"), "wrong password rejected");
+  await sleep(300); ok(html().includes("Try the demo") && html().includes("admin@maplepro.test") && html().includes("maple123"), "landing page first, with exact demo emails and password"); await go("#/login"); ok(html().includes("Sign in to MaplePro"), "login page");
+  form("login", { email: "pm@maplepro.test", password: "nope" }); await sleep(100); ok(html().includes("Sign in to MaplePro"), "wrong password rejected");
   form("login", { email: "pm@maplepro.test", password: "maple123" }); await sleep(200); ok(html().includes("Command Center") && html().includes("$793,500"), "staff Command Center with $793,500 overdue");
   await go("#/finance"); ok(html().includes("INV-2026-008") && html().includes("41%"), "finance shows invoice and probability");
   click('[data-act="draft"]'); await sleep(300); ok(w.location.hash === "#/approvals" && html().includes("Send reminder for INV-2026-008") && html().includes("executed"), "reminder auto-runs through PayPal API");
@@ -23,14 +23,14 @@ const go = async h => { w.location.hash = h; await sleep(150); };
   form("report", { pid: "1", raw: "Foundation is complete. Crew of 8." }); await sleep(300); await go("#/approvals"); ok(html().includes("Invoice milestone: Foundation"), "milestone invoice proposed");
   click('[data-act="approve"]'); await sleep(300); ok(html().includes("executed") && calls.includes("/api/paypal/invoice"), "staff over limit?");
   console.log("approve result card:", /Over the/.test(html()) ? "blocked by limit (alert shown)" : "approved");
-  click('[data-act="logout"]'); await sleep(150); form("login", { email: "admin@maplepro.test", password: "maple123" }); await sleep(200);
+  click('[data-act="logout"]'); await sleep(150); ok(html().includes("Try the demo"), "sign out returns to landing page"); await go("#/login"); form("login", { email: "admin@maplepro.test", password: "maple123" }); await sleep(200);
   await go("#/approvals"); click('[data-act="approve"]'); await sleep(300); ok(!html().includes("Invoice milestone: Foundation") || html().includes("executed"), "admin approves milestone invoice");
   await go("#/finance"); click('[data-act="simpaid"]'); await sleep(300); ok(html().includes("Pay Sam Subcontractor for 76 approved hours"), "payment triggers payout proposal");
   click('[data-act="approve"]'); await sleep(300); ok(calls.includes("/api/paypal/payout"), "payout sent through PayPal API");
-  click('[data-act="logout"]'); await sleep(150); form("login", { email: "sub@maplepro.test", password: "maple123" }); await sleep(200);
+  click('[data-act="logout"]'); await sleep(150); await go("#/login"); form("login", { email: "sub@maplepro.test", password: "maple123" }); await sleep(200);
   ok(html().includes("My payouts") && html().includes("$4,446"), "subcontractor sees net payout with 10% holdback");
   await go("#/finance"); ok(html().includes("Not allowed"), "subcontractor blocked from finance");
-  click('[data-act="logout"]'); await sleep(150); form("login", { email: "client@example.com", password: "maple123" }); await sleep(200);
+  click('[data-act="logout"]'); await sleep(150); click('[data-act="demo"][data-email="client@example.com"]'); await sleep(250);
   ok(html().includes("INV-2026-008") && !html().includes("INV-2026-009"), "client sees only own invoices");
   process.exit(process.exitCode || 0);
 })();
