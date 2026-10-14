@@ -2,14 +2,14 @@
 // MaplePro browser app. Data lives in IndexedDB; the server is only used for Gemini and PayPal calls.
 const E = window.Engine, { add: addD, today, money, diff } = E;
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const T = ["clients", "projects", "invoices", "reports", "actions", "users", "members", "tasks", "timesheets", "payouts", "budget_lines", "meta"];
+const T = ["proposals", "materials", "equipment", "incidents", "notes", "clients", "projects", "invoices", "reports", "actions", "users", "members", "tasks", "timesheets", "payouts", "budget_lines", "meta"];
 let S = {}, idb, ME = null, ST = { paypal: false, gemini: false };
 const CFG = { staffLimit: 50000, holdback: 0.1, rate: 65, milestonePct: 0.08, access: "", lat: 43.77, lon: -79.41, autoKinds: ["remind"] };
 const now = () => new Date().toISOString().slice(0, 19);
 
 // ---- IndexedDB: everything is loaded into memory at start, writes go through to the database ------------
-const openDb = () => new Promise((res, rej) => { const r = indexedDB.open("maplepro", 1);
-  r.onupgradeneeded = () => T.forEach(t => r.result.createObjectStore(t, { keyPath: "id" })); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const openDb = () => new Promise((res, rej) => { const r = indexedDB.open("maplepro", 2);
+  r.onupgradeneeded = () => T.forEach(t => { if (!r.result.objectStoreNames.contains(t)) r.result.createObjectStore(t, { keyPath: "id" }); }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 const loadAll = () => Promise.all(T.map(t => new Promise(res => { const q = idb.transaction(t).objectStore(t).getAll(); q.onsuccess = () => res((S[t] = q.result)); })));
 const put = (t, row) => { idb.transaction(t, "readwrite").objectStore(t).put(row); return row; };
 const add = (t, row) => { row = { ...row, id: Math.max(0, ...S[t].map(r => r.id)) + 1 }; S[t].push(row); return put(t, row); };
@@ -21,11 +21,11 @@ const gem = async prompt => { try { return (await api("gemini", { prompt })).res
 
 function seed() {
   const t = today(), d = n => addD(t, -n), A = (tb, rows) => rows.forEach(r => add(tb, r));
-  A("clients", [["Acme Real Estate Development", "client@example.com"], ["Downtown Commercial Properties", "billing@example.com"], ["Suburban Retail Group", "ap@example.com"]].map(([name, email]) => ({ name, email })));
+  A("clients", [["Acme Real Estate Development", "client@example.com", "+1 (555) 234 5678"], ["Downtown Commercial Properties", "billing@example.com", "+1 (555) 311 0042"], ["Suburban Retail Group", "ap@example.com", "+1 (555) 902 7710"]].map(([name, email, phone]) => ({ name, email, phone })));
   A("projects", [["Riverside Luxury Apartments", 1, 3500000, 980000, 28, "2027-09-30", "12-story, 150-unit apartment complex with underground parking, pool, gym and rooftop terrace."],
     ["Downtown Office Tower Renovation", 2, 2500000, 700000, 18, "2027-03-15", "Interior and facade renovation of a 9-story office tower."],
     ["Suburban Shopping Center", 3, 1500000, 182200, 12, "2027-06-01", "New 40,000 sq ft retail center with shared parking."]]
-    .map(([name, client_id, budget, spent, progress, due, description]) => ({ name, client_id, budget, spent, progress, due, description })));
+    .map(([name, client_id, budget, spent, progress, due, description]) => ({ name, client_id, budget, spent, progress, due, description, created: d(60) })));
   A("invoices", [["INV-2026-008", 1, 1, 250500, d(27), "sent"], ["INV-2026-009", 2, 2, 215000, d(15), "sent"], ["INV-2026-004", 2, 2, 328000, d(12), "sent"],
     ["INV-2026-011", 1, 1, 180000, d(-12), "sent"], ["INV-2026-012", 3, 3, 95000, d(-20), "sent"], ["INV-2026-002", 1, 1, 400000, d(60), "paid"]]
     .map(([number, project_id, client_id, amount, due_date, status]) => ({ number, project_id, client_id, amount, due_date, status, paypal_id: null })));
@@ -38,6 +38,14 @@ function seed() {
     ts.forEach(([name, days, progress, wx], i) => { const pred = name === "Drywall" ? prev - 1 : i ? prev : null;
       prev = add("tasks", { project_id: +pid, name, days, pred, progress, slip: 0, wx, start: d(45) }).id; }); }
   A("timesheets", [[9, 40, "approved"], [2, 36, "approved"], [0, 8, "submitted"]].map(([n, hours, status]) => ({ project_id: 1, user_id: 4, work_date: d(n), hours, rate: 65, status, payout_id: null })));
+  A("proposals", [["Phase 2 fit-out", 1, 420000, "Sent"], ["Lobby renovation", 2, 185000, "Accepted"], ["Parking structure repair", 3, 96000, "Draft"]].map(([title, client_id, amount, status]) => ({ title, client_id, amount, status, created: t })));
+  A("materials", [["Cement bags", "bag", 320, 100, 12.5], ["Concrete mix", "m3", 85, 30, 165], ["Drywall sheets", "sheet", 600, 200, 14], ["Electrical wire (500 ft)", "roll", 48, 20, 185], ["Lumber 2x4", "pc", 1500, 500, 6.5],
+    ["Plywood 3/4 in", "sheet", 90, 100, 48], ["PVC pipe 4 in", "pc", 220, 80, 18], ["Interior paint", "pail", 140, 40, 62], ["Roofing shingles", "bundle", 410, 150, 38], ["Insulation rolls", "roll", 260, 100, 54],
+    ["Rebar #5", "ton", 22, 8, 1250], ["Nails 3 in", "box", 300, 100, 22], ["Floor tile 12x12", "box", 380, 120, 32], ["Interior doors", "ea", 60, 20, 210], ["Window units", "ea", 14, 6, 420]].map(([name, unit, qty, min_qty, unit_cost]) => ({ name, unit, qty, min_qty, unit_cost })));
+  A("equipment", ["Excavator CAT 320", "Tower crane", "Skid steer", "Concrete mixer", "Scissor lift", "Backhoe loader", "Dump truck", "Generator 100 kW", "Compactor", "Forklift", "Boom lift", "Concrete pump"]
+    .map((name, i) => ({ name, type: i < 3 ? "Heavy" : i < 8 ? "Site" : "Lifting", status: i < 8 ? "In use" : i < 11 ? "Available" : "Maintenance", rate: 45 + i * 12 })));
+  A("incidents", [["Slip on wet surface", "Low", "Closed", 1], ["Minor cut", "Low", "Closed", 2], ["Near miss: falling object", "Medium", "Closed", 1], ["Missing guardrail", "High", "Investigating", 1], ["Equipment strike", "Medium", "Open", 3], ["Heat exhaustion", "Medium", "Closed", 2], ["PPE violation", "Low", "Closed", 3]]
+    .map(([type, severity, status, project_id], i) => ({ type, severity, status, project_id, date: d(i * 4 + 1), description: "" })));
   S.projects.forEach(p => [["labor", .30, .38], ["materials", .35, .30], ["equipment", .10, .10], ["subs", .25, .22]]
     .forEach(([category, pl, ac]) => add("budget_lines", { project_id: p.id, category, budget: Math.round(p.budget * p.progress / 100 * pl), actual: Math.round(p.spent * ac) })));
 }
@@ -46,7 +54,7 @@ function seed() {
 const staff = () => ME && ["admin", "staff"].includes(ME.role);
 const cl = id => S.clients.find(c => c.id == id), proj = id => S.projects.find(p => p.id == id);
 const myProjects = () => staff() ? S.projects : ME.role === "client" ? S.projects.filter(p => p.client_id == ME.client_id) : S.projects.filter(p => S.members.some(m => m.user_id == ME.id && m.project_id == p.id));
-const invs = () => S.invoices.filter(i => i.status !== "paid").map(i => { const dd = Math.max(diff(today(), i.due_date), 0), c = cl(i.client_id);
+const invs = () => S.invoices.filter(i => i.status === "sent").map(i => { const dd = Math.max(diff(today(), i.due_date), 0), c = cl(i.client_id);
   return { ...i, client: c.name, email: c.email, project: proj(i.project_id).name, days_over: dd, prob: E.payProb(dd, i.amount), risk: dd > 10 ? "high" : "healthy" }; })
   .sort((a, b) => (a.due_date < b.due_date ? -1 : 1));
 const logAction = (agent, kind, ref, title, rationale, payload) => add("actions", { agent, kind, ref_id: ref, title, rationale, payload, status: "pending", result: null, created: now(), decided: null });
@@ -84,6 +92,8 @@ async function execute(a) {
   if (a.kind === "remind") { const inv = S.invoices.find(i => i.id == a.ref_id), c = cl(inv.client_id);
     if (inv.paypal_id) return api("paypal/remind", { id: inv.paypal_id, subject: p.subject, note: p.note, rid });
     const r = await api("paypal/invoice", { number: inv.number, email: c.email, items: [[`Invoice ${inv.number}`, inv.amount]], note: p.note, rid }); upd("invoices", inv.id, { paypal_id: r.id }); return r; }
+  if (a.kind === "send_invoice") { const inv = S.invoices.find(i => i.id == a.ref_id), c = cl(inv.client_id);
+    const r = await api("paypal/invoice", { number: inv.number, email: c.email, items: [[p.desc || `Invoice ${inv.number}`, inv.amount]], note: p.desc || "", rid }); upd("invoices", inv.id, { paypal_id: r.id, status: "sent" }); return r; }
   if (a.kind === "create_invoice") { const pr = proj(a.ref_id), c = cl(pr.client_id), n = Math.max(0, ...S.invoices.map(i => i.id)) + 100, number = `INV-${new Date().getFullYear()}-${String(n).padStart(3, "0")}`;
     const r = await api("paypal/invoice", { number, email: c.email, items: [[`${p.milestone} (net of ${CFG.holdback * 100}% holdback)`, p.amount]], note: "Progress billing: " + p.milestone, rid });
     add("invoices", { number, project_id: pr.id, client_id: pr.client_id, amount: p.amount, due_date: addD(today(), 30), status: "sent", paypal_id: r.id }); return r; }
@@ -114,187 +124,254 @@ async function sync() {
 }
 
 // ---- UI ---------------------------------------------------------------------------------------------------------
-const badge = (t, c = "bg-slate-100 text-slate-700") => `<span class="text-xs px-2 py-0.5 rounded-full ${c}">${esc(t)}</span>`;
-const bar = (v, c) => `<div class="h-2 rounded bg-slate-100"><div class="h-2 rounded ${c}" style="width:${Math.min(v, 100)}%"></div></div>`;
-const btn = (label, act, data = "", cls = "bg-blue-600 text-white hover:bg-blue-700") => `<button data-act="${act}" ${data} class="rounded-md px-3 py-1.5 text-sm ${cls}">${label}</button>`;
-const ghost = "border hover:bg-slate-50";
-function card(a) { const p = a.payload;
-  return `<div class="rounded-lg border bg-white p-4"><div class="flex items-center gap-2">${badge(a.agent, "bg-indigo-100 text-indigo-800")}<span class="font-medium text-sm">${esc(a.title)}</span>
-    ${a.status !== "pending" ? `<span class="ml-auto">${badge(a.status, a.status === "executed" ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700")}</span>` : ""}</div>
-    ${p.note ? `<p class="mt-2 text-sm text-slate-600">"${esc(p.note)}"</p>` : ""}${p.amount ? `<p class="mt-2 text-sm text-slate-600">Amount ${money(p.amount)}, holdback ${money(p.holdback)}</p>` : ""}
-    <details class="mt-2 text-xs text-slate-500"><summary class="cursor-pointer">Why did the agent propose this?</summary><p class="mt-1">${esc(a.rationale)}</p>${a.result ? `<p class="mt-1 break-all">Result: ${esc(JSON.stringify(a.result))}</p>` : ""}</details>
-    ${a.status === "pending" ? `<div class="mt-3 flex gap-2">${btn("Approve and send via PayPal", "approve", `data-id="${a.id}"`)}${btn("Reject", "reject", `data-id="${a.id}"`, ghost)}</div>` : ""}</div>`; }
-const stat = (l, v, c = "bg-white") => `<div class="rounded-lg border ${c} p-4"><div class="text-xs text-slate-500">${l}</div><div class="text-xl font-semibold">${v}</div></div>`;
+const bdg = (t, k = "n") => `<span class="badge b-${k}">${esc(t)}</span>`;
+const TONE = { executed: "ok", paid: "ok", approved: "ok", Accepted: "ok", Available: "ok", Closed: "ok", sent: "info", Sent: "info", "In use": "info", processing: "info", in_payout: "info", pending: "warn", submitted: "warn", proposed: "warn", Open: "warn", Investigating: "warn", Maintenance: "warn", Medium: "warn", failed: "bad", High: "bad", Critical: "bad" };
+const st = s => bdg(s, TONE[s] || "n");
+const bar = (v, k = "bg-blue-600") => `<div class="h-2 rounded-full" style="background:var(--hover)"><div class="h-2 rounded-full ${k}" style="width:${Math.min(Math.max(v, 0), 100)}%"></div></div>`;
+const btn = (label, act, data = "", k = "") => `<button data-act="${act}" ${data} class="btn ${k}">${label}</button>`;
+const head = (t, s = "", a = "") => `<div class="mb-6 flex flex-wrap items-start justify-between gap-3"><div><h1 class="text-2xl font-semibold tracking-tight">${t}</h1>${s ? `<p class="muted mt-1 text-sm">${s}</p>` : ""}</div><div class="flex flex-wrap gap-2">${a}</div></div>`;
+const sec = (t, body, a = "") => `<section class="mt-8"><div class="mb-3 flex items-center justify-between gap-2"><h2 class="text-base font-semibold">${t}</h2>${a}</div>${body}</section>`;
+const stat = (l, v, sub = "") => `<div class="card p-4"><div class="muted text-xs">${l}</div><div class="mt-1 text-2xl font-semibold">${v}</div>${sub ? `<div class="muted mt-1 text-xs">${sub}</div>` : ""}</div>`;
+const stats = a => `<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-${Math.min(a.length, 4)}">${a.map(x => stat(...x)).join("")}</div>`;
+const tbl = (cols, rows) => `<div class="card overflow-x-auto"><table class="w-full text-sm"><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${cols.length}" class="muted">Nothing here yet.</td></tr>`}</tbody></table></div>`;
+const fld = ([k, l, type = "text", opts, optional]) => `<label class="block text-sm font-medium">${l}${optional ? ' <span class="muted font-normal">(optional)</span>' : ""}` + (type === "select"
+  ? `<select name="${k}" ${optional ? "" : "required"} class="input mt-1">${optional ? '<option value="">None</option>' : ""}${(typeof opts === "function" ? opts() : opts).map(o => Array.isArray(o) ? `<option value="${o[0]}">${esc(o[1])}</option>` : `<option>${esc(o)}</option>`).join("")}</select>`
+  : type === "textarea" ? `<textarea name="${k}" ${optional ? "" : "required"} rows="3" class="input mt-1"></textarea>`
+  : `<input name="${k}" type="${type}" ${optional ? "" : "required"} step="any" class="input mt-1">`) + "</label>";
+const form = (name, fields, label = "Save", data = "") => `<form data-form="${name}" ${data} class="grid gap-4 sm:grid-cols-2">${fields.map(f => `<div ${["textarea"].includes(f[2]) ? 'class="sm:col-span-2"' : ""}>${fld(f)}</div>`).join("")}<div class="sm:col-span-2"><button class="btn btn-primary">${label}</button></div></form>`;
+const create = (label, inner) => `<details class="card mb-6 p-5"><summary class="btn btn-primary inline-flex cursor-pointer">+ ${label}</summary><div class="mt-5">${inner}</div></details>`;
+const toggles = () => `<button data-act="theme" class="btn" aria-label="Switch between light and dark mode">${document.documentElement.classList.contains("dark") ? "Light mode" : "Dark mode"}</button><button data-act="font" class="btn" aria-label="Switch text size" title="Text size">${document.documentElement.classList.contains("lg") ? "Aa smaller" : "Aa larger"}</button>`;
+function actCard(a) { const p = a.payload;
+  return `<div class="card p-4"><div class="flex flex-wrap items-center gap-2">${bdg(a.agent, "info")}<span class="text-sm font-medium">${esc(a.title)}</span>${a.status !== "pending" ? `<span class="ml-auto">${st(a.status)}</span>` : ""}</div>
+  ${p.note ? `<p class="muted mt-2 text-sm">"${esc(p.note)}"</p>` : ""}${p.amount ? `<p class="muted mt-2 text-sm">Amount ${money(p.amount)}${p.holdback ? `, holdback ${money(p.holdback)}` : ""}</p>` : ""}
+  <details class="muted mt-2 text-xs"><summary class="cursor-pointer">Why was this proposed?</summary><p class="mt-1">${esc(a.rationale)}</p>${a.result ? `<p class="mt-1 break-all">Result: ${esc(JSON.stringify(a.result))}</p>` : ""}</details>
+  ${a.status === "pending" ? `<div class="mt-3 flex gap-2">${btn("Approve and send", "approve", `data-id="${a.id}"`, "btn-primary")}${btn("Reject", "reject", `data-id="${a.id}"`)}</div>` : ""}</div>`; }
 
+const NAV = [["#/", "Command Center"], ["#/finance", "Financial Intelligence"], ["#/field", "Field Operations"], ["#/projects", "Projects"], ["#/clients", "Clients"], ["#/proposals", "Proposals"], ["#/invoices", "Invoices"],
+  ["#/reports", "Reports"], ["#/materials", "Materials"], ["#/equipment", "Equipment"], ["#/safety", "Safety"], ["#/budget", "Budget"], ["#/approvals", "Approvals"], ["#/admin", "Admin"]];
 function layout(body) {
-  const nav = [["#/", staff() ? "Command Center" : "My work"], ...(staff() ? [["#/finance", "Financial Intelligence"], ["#/timesheets", "Timesheets"], ["#/approvals", "Approvals & Audit"]] : []), ...(ME.role === "admin" ? [["#/settings", "Settings"]] : [])];
-  const cur = location.hash || "#/";
-  return `<div class="flex min-h-screen"><aside class="w-56 shrink-0 bg-slate-950 text-slate-300 p-4 hidden md:block"><div class="text-white text-lg font-semibold">MaplePro</div><div class="text-xs text-slate-500 mb-6">Decision Intelligence</div>
-    ${nav.map(([h, l]) => `<a href="${h}" class="block rounded-md px-3 py-2 text-sm ${cur === h ? "bg-slate-800 text-white" : "hover:bg-slate-900"}">${l}</a>`).join("")}
-    ${ME.role === "admin" ? `<button data-act="csv" class="block w-full text-left rounded-md px-3 py-2 text-sm hover:bg-slate-900">Export audit log</button>` : ""}</aside>
-    <div class="flex-1 min-w-0"><header class="bg-white border-b px-6 py-3 flex flex-wrap items-center gap-3 text-sm">
-    <form data-form="ask" class="flex-1 min-w-[12rem] max-w-md"><label class="sr-only" for="q">Ask MaplePro</label><input id="q" name="q" placeholder="Ask: which invoices are overdue?" class="w-full rounded-md border px-3 py-1.5"></form>
-    ${badge("PayPal: " + (ST.paypal ? "sandbox connected" : "mock mode"), ST.paypal ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800")}
-    <button data-act="reset" class="text-xs underline text-slate-500">Reset local data</button><span>${esc(ME.name)} (${ME.role})</span><button data-act="logout" class="underline text-blue-700">Sign out</button></header>
-    <main class="p-6 max-w-6xl">${body}</main></div></div>`; }
+  const nav = staff() ? NAV.filter(n => n[1] !== "Admin" || ME.role === "admin") : [["#/", "My work"]], cur = location.hash || "#/", on = h => (h === "#/" ? cur === "#/" || cur === "" : cur.startsWith(h));
+  const pend = S.actions.filter(a => a.status === "pending").length;
+  return `<div class="flex min-h-screen"><aside class="hidden w-60 shrink-0 p-4 md:block" style="background:var(--side)"><div class="px-3 pb-6 pt-2"><div class="text-lg font-semibold text-white">MaplePro</div><div class="text-xs text-slate-400">Decision Intelligence</div></div>
+  <nav class="space-y-1">${nav.map(([h, l]) => `<a href="${h}" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm ${on(h) ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/5"}">${l}${l === "Approvals" && pend ? `<span class="badge b-warn">${pend}</span>` : ""}</a>`).join("")}</nav></aside>
+  <div class="min-w-0 flex-1"><header class="flex flex-wrap items-center gap-3 border-b px-6 py-3" style="background:var(--surface);border-color:var(--border)"><span class="text-sm font-medium">Welcome, ${esc(ME.name)}</span>
+  <form data-form="ask" class="ml-auto min-w-[14rem] flex-1 sm:max-w-sm"><label class="sr-only" for="q">Search or ask</label><input id="q" name="q" class="input" placeholder="Search or ask anything (Ctrl K)"></form>${toggles()}
+  <span class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white" title="${esc(ME.email)}">${esc(ME.name[0])}</span>${btn("Sign out", "logout")}</header>
+  <nav class="flex gap-2 overflow-x-auto border-b p-2 md:hidden" style="border-color:var(--border)">${nav.map(([h, l]) => `<a href="${h}" class="btn">${l}</a>`).join("")}</nav>
+  <main class="mx-auto max-w-6xl p-6 md:p-8">${body}</main></div></div>`; }
 
 const V = {};
-const accounts = () => [["Admin", "admin", "Everything: all approvals, Settings, audit export"], ["Project manager", "staff", `Command Center; approves up to ${money(CFG.staffLimit)}`],
-  ["Client", "client", "Own projects and invoices only"], ["Subcontractor", "subcontractor", "Timesheets and payouts only"]].map(([label, role, desc]) => ({ label, desc, email: S.users.find(u => u.role === role).email }));
-const acctTable = () => `<div class="overflow-x-auto rounded-xl border bg-white"><table class="w-full text-sm"><thead class="bg-slate-50 text-left text-xs text-slate-500"><tr><th class="p-3">Role</th><th class="p-3">Email</th><th class="p-3">Password</th><th class="p-3 hidden md:table-cell">What they can see</th><th></th></tr></thead>
-  <tbody class="divide-y">${accounts().map(a => `<tr><td class="p-3 font-medium whitespace-nowrap">${a.label}</td><td class="p-3 font-mono">${esc(a.email)}</td><td class="p-3 font-mono">maple123</td><td class="p-3 hidden md:table-cell text-slate-600">${a.desc}</td>
-  <td class="p-3 text-right whitespace-nowrap"><button data-act="demo" data-email="${esc(a.email)}" class="rounded-md bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700">Sign in as ${a.label.toLowerCase()}</button></td></tr>`).join("")}</tbody></table></div>`;
+const accounts = () => [["Admin", "admin"], ["Project manager", "staff"], ["Client", "client"], ["Subcontractor", "subcontractor"]].map(([label, role]) => ({ label, email: S.users.find(u => u.role === role).email }));
+V.landing = () => `<div class="min-h-screen"><header class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-5"><span class="text-lg font-semibold">MaplePro</span><div class="flex gap-2">${toggles()}<a href="#/login" class="btn btn-primary">Sign in</a></div></header>
+  <section class="mx-auto max-w-6xl px-6 pb-16 pt-14"><p class="text-sm font-medium text-blue-600">Construction management</p><h1 class="mt-3 max-w-3xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">Run every project, budget and invoice in one place.</h1>
+  <p class="muted mt-5 max-w-2xl text-lg">MaplePro gives contractors a clear view of schedules, costs, field work and payments, so problems show up early and invoices go out on time.</p><div class="mt-8"><a href="#/login" class="btn btn-primary px-6 py-3">Sign in</a></div></section>
+  <section class="mx-auto max-w-6xl px-6 pb-20"><div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">${[["Projects and schedules", "Track tasks, dependencies, the critical path and weather risk for every job."], ["Budgets and costs", "Compare planned and actual spend by category and see variances as they happen."],
+    ["Field operations", "Daily reports, materials, equipment and safety incidents, together."], ["Invoicing and payments", "Send invoices and pay subcontractors through PayPal, with approvals you control."], ["Clients and subcontractors", "Each person sees only their own projects, invoices and timesheets."], ["Reports", "Materials, equipment, safety and budget reports you can export."]]
+    .map(([t, d]) => `<div class="card p-5"><h3 class="font-semibold">${t}</h3><p class="muted mt-2 text-sm">${d}</p></div>`).join("")}</div></section>
+  <footer class="muted border-t px-6 py-6 text-center text-sm" style="border-color:var(--border)">MaplePro demo. Sample data is stored in this browser only.</footer></div>`;
+V.login = () => `<div class="grid min-h-screen lg:grid-cols-2"><div class="hidden flex-col justify-between p-10 text-white lg:flex" style="background:var(--side)"><div class="text-xl font-semibold">MaplePro</div>
+  <div><p class="max-w-md text-3xl font-semibold leading-snug">Know where every project stands, and get paid sooner.</p><p class="mt-3 max-w-md text-sm text-slate-400">Schedules, budgets, field work and payments in one place.</p></div><a href="#/" class="text-sm text-slate-400 underline">Back to home</a></div>
+  <div class="flex items-center justify-center p-6"><div class="w-full max-w-md"><div class="mb-6 flex justify-between lg:hidden"><a href="#/" class="link text-sm">Home</a></div><div class="mb-4 flex justify-end gap-2">${toggles()}</div>
+  <h1 class="text-2xl font-semibold tracking-tight">Welcome back</h1><p class="muted mt-1 text-sm">Sign in to your account.</p>
+  <form data-form="login" class="mt-6 space-y-4"><label class="block text-sm font-medium">Email<input id="email" name="email" type="email" required autocomplete="username" class="input mt-1"></label>
+  <label class="block text-sm font-medium">Password<input id="password" name="password" type="password" required autocomplete="current-password" class="input mt-1"></label><button class="btn btn-primary w-full justify-center py-2.5">Sign in</button></form>
+  <div class="card mt-8 p-4"><h2 class="text-sm font-semibold">Demo accounts</h2><p class="muted mt-1 text-xs">Password for every account: <span class="font-mono">maple123</span></p>
+  <ul class="mt-3 divide-y text-sm" style="border-color:var(--border)">${accounts().map(a => `<li class="flex items-center justify-between gap-2 py-2"><div><div class="font-medium">${a.label}</div><div class="muted font-mono text-xs">${esc(a.email)}</div></div>${btn("Use", "fill", `data-email="${esc(a.email)}"`)}</li>`).join("")}</ul></div></div></div></div>`;
 
-V.landing = () => `<div class="min-h-screen bg-slate-50"><header class="bg-slate-950 text-white"><div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4"><span class="text-lg font-semibold">MaplePro</span>
-  <a href="#/login" class="rounded-md border border-slate-600 px-3 py-1.5 text-sm hover:bg-slate-800">Sign in</a></div>
-  <div class="mx-auto max-w-6xl px-6 pb-16 pt-12"><p class="text-sm text-blue-300">Construction management, run by AI agents</p>
-  <h1 class="mt-3 max-w-3xl text-4xl font-semibold leading-tight">Turn a messy field note into a schedule update, a cost update and a paid invoice.</h1>
-  <p class="mt-4 max-w-2xl text-slate-300">MaplePro's agents read daily reports, forecast delays and budget overruns, and prepare invoices and subcontractor payouts. You approve every move of money, and PayPal does the payment.</p>
-  <div class="mt-8 flex flex-wrap gap-3"><a href="#demo" data-act="scroll" class="rounded-md bg-blue-600 px-5 py-2.5 font-medium hover:bg-blue-500">Try the demo</a><a href="#/login" class="rounded-md border border-slate-600 px-5 py-2.5 hover:bg-slate-800">Sign in</a></div></div></header>
-  <main class="mx-auto max-w-6xl space-y-14 px-6 py-12">
-  <section><h2 class="text-xl font-semibold">What it does</h2><div class="mt-4 grid gap-4 md:grid-cols-3">
-  ${[["Reads the site", "Paste a field note. The Site Agent pulls out work done, delays, risks and milestones, and asks when something is missing."], ["Sees the consequences", "Delays move the critical path and finish date, weather is checked, and overtime shows up as budget variance, explained in plain language."], ["Moves the money, with you in control", "Milestones become PayPal invoices, client payments trigger subcontractor payouts with holdback, and big actions need an admin."]]
-  .map(([t, d]) => `<div class="rounded-xl border bg-white p-5"><h3 class="font-medium">${t}</h3><p class="mt-2 text-sm text-slate-600">${d}</p></div>`).join("")}</div></section>
-  <section><h2 class="text-xl font-semibold">How a project event flows</h2><ol class="mt-4 grid gap-3 text-sm md:grid-cols-5">${["Field note", "Agents analyse", "Schedule and budget update", "You approve", "PayPal invoice or payout"]
-  .map((t, i) => `<li class="rounded-lg border bg-white p-4"><span class="text-xs text-blue-700">Step ${i + 1}</span><div class="mt-1 font-medium">${t}</div></li>`).join("")}</ol></section>
-  <section id="demo"><h2 class="text-xl font-semibold">Try the demo</h2><p class="mt-1 text-sm text-slate-600">Four demo accounts, all with the password <span class="font-mono">maple123</span>. Click a button to sign in as that role. Data is fake and stays in this browser; PayPal runs in sandbox or mock mode.</p><div class="mt-4">${acctTable()}</div></section></main></div>`;
-
-V.login = () => `<div class="mx-auto max-w-3xl px-6 py-10"><a href="#/" class="text-sm text-blue-700 underline">Back to home</a><h1 class="mt-3 text-2xl font-semibold">Sign in to MaplePro</h1>
-  <form data-form="login" class="mt-4 max-w-sm space-y-3 rounded-xl border bg-white p-6"><label class="block text-sm">Email<input name="email" type="email" required autocomplete="username" class="mt-1 w-full rounded-md border px-3 py-1.5"></label>
-  <label class="block text-sm">Password<input name="password" type="password" required autocomplete="current-password" class="mt-1 w-full rounded-md border px-3 py-1.5"></label><button class="w-full rounded-md bg-blue-600 py-2 text-white hover:bg-blue-700">Sign in</button></form>
-  <h2 class="mt-8 mb-2 font-medium">Demo accounts</h2><p class="mb-3 text-sm text-slate-600">Use these exact emails with the password <span class="font-mono">maple123</span>, or click a button.</p>${acctTable()}</div>`;
-
-V.command = () => { const all = invs(), od = all.filter(i => i.days_over > 0), projs = S.projects.map(p => { const burn = Math.round(p.spent / p.budget * 100); return { ...p, burn, gap: burn - p.progress, client: cl(p.client_id).name, overdue: od.filter(i => i.project_id == p.id).reduce((s, i) => s + i.amount, 0) }; });
-  const stream = projs.filter(p => p.gap >= 8).map(p => ({ a: "Budget", t: `${p.name}: ${p.burn}% of budget spent against ${p.progress}% progress.`, c: Math.min(95, 55 + p.gap * 2) }));
-  if (od.length) stream.unshift({ a: "Billing", t: `${od.length} invoices overdue, ${money(od.reduce((s, i) => s + i.amount, 0))} outstanding.`, c: 90 });
-  const week = [...projs.filter(p => !S.reports.some(r => r.project_id == p.id)).map(p => `Submit a daily report for ${p.name}`), ...all.filter(i => i.days_over === 0 && i.due_date > today()).map(i => `${i.number} due in ${diff(i.due_date, today())} days`)];
-  const pend = S.actions.filter(a => a.status === "pending").reverse();
-  return `<h1 class="text-2xl font-semibold">Command Center</h1><section class="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-4"><h2 class="font-medium">AI Intelligence Stream</h2>
-  ${stream.map(s => `<div class="mt-2 flex gap-2 text-sm">${badge(s.a, "bg-white border")}<span>${esc(s.t)}</span><span class="ml-auto whitespace-nowrap text-slate-500">heuristic ${s.c}%</span></div>`).join("") || `<p class="mt-2 text-sm">No risks detected.</p>`}</section>
-  <section class="mt-6"><h2 class="font-medium mb-2">Priority intelligence</h2><div class="grid gap-3 md:grid-cols-3">
-  <div class="rounded-lg border bg-white p-4"><div class="text-red-600 font-medium">Urgent</div>${od.filter(i => i.days_over >= 14).map(i => `<p class="mt-2 text-sm"><a class="text-blue-700 underline" href="#/finance">${i.number}</a> is ${i.days_over} days overdue (${money(i.amount)})</p>`).join("")}</div>
-  <div class="rounded-lg border bg-white p-4"><div class="text-amber-600 font-medium">Today (${pend.length})</div><p class="mt-2 text-sm">${pend.length} agent proposals waiting. <a class="text-blue-700 underline" href="#/approvals">Review</a></p></div>
-  <div class="rounded-lg border bg-white p-4"><div class="text-blue-600 font-medium">This week (${week.length})</div>${week.map(w => `<p class="mt-2 text-sm">${esc(w)}</p>`).join("")}</div></div></section>
-  <section class="mt-6"><h2 class="font-medium mb-2">Active projects</h2><div class="grid gap-3 md:grid-cols-3">${projs.map(p => `<a href="#/projects/${p.id}" class="rounded-lg border bg-white p-4 hover:border-blue-400 block">
-  <div class="flex justify-between gap-2"><span class="font-medium text-sm">${esc(p.name)}</span>${p.gap >= 8 ? badge("watch", "bg-amber-100 text-amber-800") : badge("on track", "bg-emerald-100 text-emerald-800")}</div><p class="text-xs text-slate-500">${esc(p.client)}</p>
-  <div class="mt-3 text-xs">Progress ${p.progress}%</div>${bar(p.progress, "bg-blue-600")}<div class="mt-2 text-xs">Budget used ${p.burn}%</div>${bar(p.burn, p.gap >= 8 ? "bg-amber-500" : "bg-emerald-500")}
-  ${p.overdue ? `<p class="mt-2 text-xs text-red-600">${money(p.overdue)} overdue</p>` : ""}</a>`).join("")}</div></section>
-  ${pend.length ? `<section class="mt-6"><h2 class="font-medium mb-2">Waiting for your approval</h2><div class="space-y-3">${pend.map(card).join("")}</div></section>` : ""}
-  <section class="mt-6 grid gap-3 md:grid-cols-3">${stat("Contract value", money(S.projects.reduce((s, p) => s + p.budget, 0)))}${stat("Spent to date", money(S.projects.reduce((s, p) => s + p.spent, 0)))}${stat("Overdue receivables", money(od.reduce((s, i) => s + i.amount, 0)))}</section>`; };
+V.command = () => { const all = invs(), od = all.filter(i => i.days_over > 0), odT = od.reduce((s, i) => s + i.amount, 0), pend = S.actions.filter(a => a.status === "pending").reverse();
+  const projs = S.projects.map(p => { const burn = Math.round(p.spent / p.budget * 100); return { ...p, burn, gap: burn - p.progress, client: cl(p.client_id).name, overdue: od.filter(i => i.project_id == p.id).reduce((s, i) => s + i.amount, 0) }; });
+  const ins = projs.filter(p => p.gap >= 8).map(p => ({ a: "Budget", t: `${p.name}: ${p.burn}% of budget spent against ${p.progress}% progress.`, c: Math.min(95, 55 + p.gap * 2) }));
+  if (od.length) ins.unshift({ a: "Billing", t: `${od.length} invoices overdue, ${money(odT)} outstanding.`, c: 90 });
+  const week = [...projs.filter(p => !S.reports.some(r => r.project_id == p.id)).map(p => `Submit a daily report for ${p.name}`), ...S.timesheets.filter(t => t.status === "submitted").map(t => `Approve ${t.hours} h timesheet for ${esc(proj(t.project_id).name)}`), ...all.filter(i => i.days_over === 0 && i.due_date > today()).map(i => `${i.number} is due in ${diff(i.due_date, today())} days`)];
+  return head("Command Center", "What needs your attention across all projects.") + stats([["Active projects", S.projects.length], ["Overdue receivables", money(odT)], ["Awaiting approval", pend.length], ["Spent of contract", money(S.projects.reduce((s, p) => s + p.spent, 0)), "of " + money(S.projects.reduce((s, p) => s + p.budget, 0))]]) +
+  sec("Intelligence stream", `<div class="card divide-y p-0" style="border-color:var(--border)">${ins.map(s => `<div class="flex flex-wrap items-center gap-3 p-4 text-sm">${bdg(s.a, "info")}<span>${esc(s.t)}</span><span class="muted ml-auto text-xs">heuristic confidence ${s.c}%</span></div>`).join("") || `<p class="muted p-4 text-sm">No risks detected.</p>`}</div>`) +
+  sec("Priority", `<div class="grid gap-4 md:grid-cols-3"><div class="card p-4"><div class="font-medium text-red-600">Urgent</div>${od.filter(i => i.days_over >= 14).map(i => `<p class="mt-2 text-sm"><a class="link" href="#/finance">${i.number}</a> is ${i.days_over} days overdue (${money(i.amount)})</p>`).join("") || '<p class="muted mt-2 text-sm">Nothing urgent.</p>'}</div>
+  <div class="card p-4"><div class="font-medium text-amber-600">Today</div><p class="mt-2 text-sm">${pend.length} proposals waiting. <a class="link" href="#/approvals">Review</a></p></div>
+  <div class="card p-4"><div class="font-medium text-blue-600">This week</div>${week.map(w => `<p class="mt-2 text-sm">${w}</p>`).join("") || '<p class="muted mt-2 text-sm">All clear.</p>'}</div></div>`) +
+  sec("Active projects", `<div class="grid gap-4 md:grid-cols-3">${projs.map(p => `<a href="#/projects/${p.id}" class="card block p-4 hover:border-blue-400"><div class="flex justify-between gap-2"><span class="text-sm font-medium">${esc(p.name)}</span>${p.gap >= 8 ? bdg("watch", "warn") : bdg("on track", "ok")}</div><p class="muted text-xs">${esc(p.client)}</p>
+  <div class="mt-3 text-xs">Progress ${p.progress}%</div>${bar(p.progress)}<div class="mt-2 text-xs">Budget used ${p.burn}%</div>${bar(p.burn, p.gap >= 8 ? "bg-amber-500" : "bg-emerald-500")}${p.overdue ? `<p class="mt-2 text-xs text-red-600">${money(p.overdue)} overdue</p>` : ""}</a>`).join("")}</div>`) +
+  (pend.length ? sec("Waiting for approval", `<div class="space-y-3">${pend.map(actCard).join("")}</div>`) : ""); };
 
 V.portal = () => { const ps = myProjects(), mine = S.timesheets.filter(t => t.user_id == ME.id).reverse();
-  return `<h1 class="text-2xl font-semibold">My work</h1><h2 class="mt-4 mb-2 font-medium">Projects</h2><div class="grid gap-3 md:grid-cols-3">${ps.map(p => `<div class="rounded-lg border bg-white p-4"><div class="font-medium text-sm">${esc(p.name)}</div><div class="mt-2 text-xs">Progress ${p.progress}%</div>${bar(p.progress, "bg-blue-600")}</div>`).join("") || `<p class="text-sm text-slate-500">No projects assigned.</p>`}</div>
-  ${ME.role === "client" ? `<h2 class="mt-6 mb-2 font-medium">Invoices</h2><div class="rounded-lg border bg-white divide-y">${S.invoices.filter(i => i.client_id == ME.client_id).map(i => `<div class="flex justify-between p-3 text-sm"><span>${i.number} · ${esc(proj(i.project_id).name)}</span><span>${money(i.amount)} · ${i.status} · due ${i.due_date}</span></div>`).join("")}</div>` :
-  `<h2 class="mt-6 mb-2 font-medium">Submit timesheet</h2><form data-form="ts" class="flex flex-wrap items-end gap-2 text-sm"><label>Project<select name="project_id" class="block rounded-md border px-2 py-1.5">${ps.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>
-  <label>Date<input type="date" name="work_date" required class="block rounded-md border px-2 py-1.5"></label><label>Hours<input type="number" step="0.5" min="0.5" max="24" name="hours" required class="block w-24 rounded-md border px-2 py-1.5"></label><button class="rounded-md bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700">Submit</button></form>
-  <h2 class="mt-6 mb-2 font-medium">My timesheets</h2><div class="rounded-lg border bg-white divide-y">${mine.map(t => `<div class="flex justify-between p-3 text-sm"><span>${t.work_date} · ${esc(proj(t.project_id).name)} · ${t.hours} h</span>${badge(t.status)}</div>`).join("")}</div>
-  <h2 class="mt-6 mb-2 font-medium">My payouts</h2><div class="rounded-lg border bg-white divide-y">${S.payouts.filter(p => p.user_id == ME.id).map(p => `<div class="flex justify-between p-3 text-sm"><span>${money(p.amount)} (holdback ${money(p.holdback)})</span>${badge(p.status)}</div>`).join("") || `<p class="p-3 text-sm text-slate-500">No payouts yet. They are proposed after the client pays.</p>`}</div>`}`; };
+  return head("My work", "Your projects and activity.") + sec("Projects", `<div class="grid gap-4 md:grid-cols-3">${ps.map(p => `<div class="card p-4"><div class="text-sm font-medium">${esc(p.name)}</div><div class="mt-2 text-xs">Progress ${p.progress}%</div>${bar(p.progress)}</div>`).join("") || '<p class="muted text-sm">No projects assigned.</p>'}</div>`) +
+  (ME.role === "client" ? sec("Invoices", tbl(["Invoice", "Project", "Amount", "Due", "Status"], S.invoices.filter(i => i.client_id == ME.client_id).map(i => [i.number, esc(proj(i.project_id).name), money(i.amount), i.due_date, st(i.status)]))) :
+  sec("Submit timesheet", `<div class="card p-5">${form("ts", [["project_id", "Project", "select", () => ps.map(p => [p.id, p.name])], ["work_date", "Date", "date"], ["hours", "Hours", "number"]], "Submit")}</div>`) +
+  sec("My timesheets", tbl(["Date", "Project", "Hours", "Status"], mine.map(t => [t.work_date, esc(proj(t.project_id).name), t.hours, st(t.status)]))) +
+  sec("My payouts", tbl(["Amount", "Holdback", "Status"], S.payouts.filter(p => p.user_id == ME.id).map(p => [money(p.amount), money(p.holdback), st(p.status)])))); };
 
 V.finance = () => { const all = invs(), od = all.filter(i => i.days_over > 0), high = all.filter(i => i.risk === "high"), ok = all.filter(i => i.days_over === 0);
-  return `<h1 class="text-2xl font-semibold">Financial Intelligence</h1><div class="mt-2">${btn("Sync payments from PayPal", "sync", "", ghost)}</div>
-  <div class="mt-4 grid gap-3 md:grid-cols-3">${stat("Overdue", money(od.reduce((s, i) => s + i.amount, 0)), "bg-red-50")}${stat("High-risk invoices", high.length)}${stat("Awaiting your approval", S.actions.filter(a => a.status === "pending").length)}</div>
-  <h2 class="mt-6 mb-2 font-medium">High risk (${high.length})</h2><div class="space-y-3">${high.map(i => `<div class="rounded-lg border border-red-200 bg-white p-4"><div class="flex flex-wrap items-center gap-2"><span class="font-medium">${i.number}</span>${badge(i.days_over + " days overdue", "bg-red-100 text-red-800")}<span class="ml-auto font-semibold">${money(i.amount)}</span></div>
-  <p class="text-sm text-slate-600">${esc(i.client)} · ${esc(i.project)}</p><p class="text-sm mt-1">Payment probability <b>${i.prob}%</b> <span class="text-xs text-slate-500">(heuristic from days overdue and amount)</span></p>
-  <div class="mt-3 flex gap-2">${btn("Draft reminder", "draft", `data-id="${i.id}"`)}${ST.paypal ? "" : btn("Simulate payment (mock)", "simpaid", `data-id="${i.id}"`, ghost)}</div></div>`).join("")}</div>
-  <h2 class="mt-6 mb-2 font-medium">Healthy (${ok.length})</h2><div class="rounded-lg border bg-white divide-y">${ok.map(i => `<div class="flex justify-between p-3 text-sm"><span>${i.number} · ${esc(i.client)}</span><span>${money(i.amount)} · due ${i.due_date} · ${i.prob}% likely on time</span></div>`).join("")}</div>`; };
+  return head("Financial Intelligence", "Receivables, payment risk and what to do about it.", btn("Sync payments from PayPal", "sync")) +
+  stats([["Outstanding", money(all.reduce((s, i) => s + i.amount, 0))], ["Overdue", money(od.reduce((s, i) => s + i.amount, 0))], ["High-risk invoices", high.length], ["Collected", money(S.invoices.filter(i => i.status === "paid").reduce((s, i) => s + i.amount, 0))]]) +
+  sec(`High risk (${high.length})`, `<div class="space-y-3">${high.map(i => `<div class="card p-4" style="border-color:#fca5a5"><div class="flex flex-wrap items-center gap-2"><span class="font-medium">${i.number}</span>${bdg(i.days_over + " days overdue", "bad")}<span class="ml-auto font-semibold">${money(i.amount)}</span></div>
+  <p class="muted text-sm">${esc(i.client)} · ${esc(i.project)}</p><p class="mt-1 text-sm">Payment probability <b>${i.prob}%</b> <span class="muted text-xs">(estimated from days overdue and amount)</span></p>
+  <div class="mt-3 flex gap-2">${btn("Draft reminder", "draft", `data-id="${i.id}"`, "btn-primary")}${ST.paypal ? "" : btn("Mark as paid (test)", "simpaid", `data-id="${i.id}"`)}</div></div>`).join("") || '<p class="muted text-sm">No high-risk invoices.</p>'}</div>`) +
+  sec(`On track (${ok.length})`, tbl(["Invoice", "Client", "Amount", "Due", "Likely on time"], ok.map(i => [i.number, esc(i.client), money(i.amount), i.due_date, i.prob + "%"]))); };
+
+V.invoices = () => head("Invoices", "Create invoices and send them through PayPal after approval.") +
+  create("New invoice", form("invoice", [["project_id", "Project", "select", () => S.projects.map(p => [p.id, p.name])], ["amount", "Amount (CAD)", "number"], ["due_date", "Due date", "date"], ["description", "Description", "text", null, 1]], "Create and request approval")) +
+  tbl(["Invoice", "Client", "Project", "Amount", "Due", "Status", ""], [...S.invoices].reverse().map(i => [i.number, esc(cl(i.client_id).name), esc(proj(i.project_id).name), money(i.amount), i.due_date, st(i.status),
+    i.status === "sent" && Math.max(diff(today(), i.due_date), 0) > 0 ? btn("Draft reminder", "draft", `data-id="${i.id}"`) : i.status === "sent" && !ST.paypal ? btn("Mark as paid (test)", "simpaid", `data-id="${i.id}"`) : ""]));
+
+const ENT = {
+  clients: { t: "Clients", one: "client", sub: "People and companies you build for.", f: [["name", "Name"], ["email", "Email", "email"], ["phone", "Phone", "tel", null, 1]], cols: ["Name", "Email", "Phone", "Projects"], row: c => [esc(c.name), esc(c.email), esc(c.phone || "-"), S.projects.filter(p => p.client_id == c.id).length] },
+  proposals: { t: "Proposals", one: "proposal", sub: "Quotes you have sent or are preparing.", f: [["title", "Title"], ["client_id", "Client", "select", () => S.clients.map(c => [c.id, c.name])], ["amount", "Amount (CAD)", "number"], ["status", "Status", "select", ["Draft", "Sent", "Accepted", "Declined"]]], def: () => ({ created: today() }),
+    cols: ["Title", "Client", "Amount", "Status", "Created"], row: p => [esc(p.title), esc(cl(p.client_id).name), money(p.amount), st(p.status), p.created] },
+  materials: { t: "Materials", one: "material", sub: "Inventory levels and value.", f: [["name", "Name"], ["unit", "Unit"], ["qty", "Quantity", "number"], ["min_qty", "Minimum quantity", "number"], ["unit_cost", "Unit cost (CAD)", "number"]],
+    stats: () => [["Total materials", S.materials.length], ["Low stock", S.materials.filter(m => m.qty > 0 && m.qty < m.min_qty).length], ["Out of stock", S.materials.filter(m => m.qty <= 0).length], ["Total value", money(S.materials.reduce((s, m) => s + m.qty * m.unit_cost, 0))]],
+    cols: ["Material", "Quantity", "Minimum", "Unit cost", "Value", "Status"], row: m => [esc(m.name), `${m.qty} ${esc(m.unit)}`, m.min_qty, money(m.unit_cost), money(m.qty * m.unit_cost), m.qty <= 0 ? bdg("Out of stock", "bad") : m.qty < m.min_qty ? bdg("Low stock", "warn") : bdg("In stock", "ok")] },
+  equipment: { t: "Equipment", one: "equipment", sub: "Fleet availability and usage.", f: [["name", "Name"], ["type", "Type"], ["status", "Status", "select", ["Available", "In use", "Maintenance"]], ["rate", "Hourly cost (CAD)", "number"]],
+    stats: () => [["Total equipment", S.equipment.length], ["Available", S.equipment.filter(e => e.status === "Available").length], ["In use", S.equipment.filter(e => e.status === "In use").length], ["Maintenance", S.equipment.filter(e => e.status === "Maintenance").length]],
+    cols: ["Name", "Type", "Status", "Hourly cost"], row: e => [esc(e.name), esc(e.type), st(e.status), money(e.rate)] },
+  incidents: { t: "Safety", one: "incident", sub: "Incidents and investigations.", f: [["project_id", "Project", "select", () => S.projects.map(p => [p.id, p.name])], ["type", "What happened"], ["severity", "Severity", "select", ["Low", "Medium", "High", "Critical"]], ["status", "Status", "select", ["Open", "Investigating", "Closed"]], ["date", "Date", "date"], ["description", "Details", "textarea", null, 1]],
+    stats: () => [["Total incidents", S.incidents.length], ["High or critical", S.incidents.filter(i => ["High", "Critical"].includes(i.severity) && i.status !== "Closed").length], ["Pending investigations", S.incidents.filter(i => i.status !== "Closed").length]],
+    cols: ["Date", "Project", "Incident", "Severity", "Status"], row: i => [i.date, esc(proj(i.project_id).name), esc(i.type), st(i.severity), st(i.status)] },
+};
+V.entity = k => { const e = ENT[k], rows = [...S[k]].reverse();
+  return head(e.t, e.sub) + (e.stats ? `<div class="mb-6">${stats(e.stats())}</div>` : "") + create("New " + e.one, form("create", e.f, "Save", `data-ent="${k}"`)) + tbl(e.cols, rows.map(e.row)); };
+
+V.projects = () => head("Projects", "All active jobs.") + create("New project", form("project", [["name", "Project name"], ["client_id", "Client", "select", () => S.clients.map(c => [c.id, c.name])], ["budget", "Contract budget (CAD)", "number"], ["due", "Due date", "date"], ["description", "Description", "textarea", null, 1]])) +
+  tbl(["Project", "Client", "Progress", "Budget", "Spent", "Due"], S.projects.map(p => [`<a class="link" href="#/projects/${p.id}">${esc(p.name)}</a>`, esc(cl(p.client_id).name), `<div class="w-32">${bar(p.progress)}<span class="text-xs">${p.progress}%</span></div>`, money(p.budget), money(p.spent), p.due]));
+
+V.project = async (id, tab) => { const p = proj(id); if (!p) return "<p>Project not found.</p>"; const c = cl(p.client_id);
+  const tabs = [["overview", "Overview"], ["schedule", "Schedule and budget"], ["time", "Time tracking"], ["notes", "Notes"], ["reports", "Daily reports"]];
+  const top = `<a href="#/projects" class="link text-sm">Back to projects</a><div class="mt-2">${head(esc(p.name), `${esc(c.name)} · due ${p.due}`)}</div><div class="mb-6 flex gap-1 overflow-x-auto border-b" style="border-color:var(--border)">${tabs.map(([k, l]) => `<a href="#/projects/${id}/${k}" class="tab ${tab === k ? "on" : ""}">${l}</a>`).join("")}</div>`;
+  if (tab === "overview") return top + `<div class="grid gap-4 md:grid-cols-2"><div class="card p-5"><h2 class="font-semibold">Project information</h2><dl class="mt-3 space-y-3 text-sm"><div><dt class="muted">Name</dt><dd>${esc(p.name)}</dd></div><div><dt class="muted">Description</dt><dd>${esc(p.description || "-")}</dd></div><div><dt class="muted">Status</dt><dd>Active</dd></div><div><dt class="muted">Created</dt><dd>${p.created || "-"}</dd></div></dl></div>
+    <div class="card p-5"><h2 class="font-semibold">Client information</h2><dl class="mt-3 space-y-3 text-sm"><div><dt class="muted">Client</dt><dd>${esc(c.name)}</dd></div><div><dt class="muted">Email</dt><dd>${esc(c.email)}</dd></div><div><dt class="muted">Phone</dt><dd>${esc(c.phone || "-")}</dd></div></dl></div></div>
+    <div class="mt-4">${stats([["Contract budget", money(p.budget)], ["Spent", money(p.spent)], ["Progress", p.progress + "%"]])}</div>`;
+  if (tab === "schedule") { const tasks = S.tasks.filter(t => t.project_id == id), pl = E.plan(tasks), wx = E.wxRisks(pl.tasks, await weather()), lines = E.variance(S.budget_lines.filter(l => l.project_id == id));
+    const reps = S.reports.filter(r => r.project_id == id).reverse(), why = await explain(lines, reps.slice(0, 3).flatMap(r => r.s.delays.map(d => d.cause)));
+    return top + sec("Schedule", (pl.finish ? `<p class="mb-3 text-sm">Forecast finish <b>${pl.finish}</b> · baseline ${pl.baseline} · <b class="${pl.slip ? "text-amber-600" : "text-emerald-600"}">${pl.slip} days behind</b></p>` : "") +
+      tbl(["Task", "Start", "Finish", "Progress", ""], pl.tasks.map(t => [esc(t.name), t.es, t.ef, t.progress + "%", (t.critical ? bdg("critical path", "bad") + " " : "") + (t.slip ? bdg("+" + t.slip + " days", "warn") : "")])) +
+      wx.map(w => `<p class="mt-2 text-sm text-amber-600">Weather risk: ${esc(w.task)} is scheduled on ${w.dates.join(", ")} (rain or freezing forecast).</p>`).join("")) +
+    create("Add task", form("task", [["name", "Task name"], ["days", "Duration (days)", "number"], ["pred", "Starts after", "select", () => tasks.map(t => [t.id, t.name]), 1], ["start", "Start date (if it starts after nothing)", "date", null, 1], ["wx", "Weather sensitive", "select", ["No", "Yes"]]], "Add task", `data-pid="${id}"`)) +
+    (tasks.length ? create("Update task progress", form("progress", [["task_id", "Task", "select", () => tasks.map(t => [t.id, t.name])], ["progress", "Percent complete", "number"]], "Update")) : "") +
+    sec("Budget against plan to date", `<p class="mb-3 text-sm">${esc(why)}</p>` + tbl(["Category", "Plan", "Actual", "Variance"], lines.map(l => [l.category[0].toUpperCase() + l.category.slice(1), money(l.budget), money(l.actual), `<b class="${l.var > 0 ? "text-red-600" : "text-emerald-600"}">${l.pct}%</b>`]))); }
+  if (tab === "time") { const ts = S.timesheets.filter(t => t.project_id == id).reverse(), subs = S.users.filter(u => u.role === "subcontractor");
+    return top + create("Log hours", form("hours", [["user_id", "Worker", "select", () => subs.map(u => [u.id, u.name])], ["work_date", "Date", "date"], ["hours", "Hours", "number"]], "Log hours", `data-pid="${id}"`)) +
+      tbl(["Date", "Worker", "Hours", "Cost", "Status", ""], ts.map(t => [t.work_date, esc(S.users.find(u => u.id == t.user_id).name), t.hours, money(t.hours * t.rate), st(t.status), t.status === "submitted" ? btn("Approve", "tsapprove", `data-id="${t.id}"`, "btn-primary") : ""])); }
+  if (tab === "notes") return top + create("Add note", form("note", [["text", "Note", "textarea"]], "Save note", `data-pid="${id}"`)) + `<div class="space-y-3">${S.notes.filter(n => n.project_id == id).reverse().map(n => `<div class="card p-4 text-sm"><div class="muted text-xs">${esc(n.author)} · ${n.created}</div><p class="mt-1">${esc(n.text)}</p></div>`).join("") || '<p class="muted text-sm">No notes yet.</p>'}</div>`;
+  const reps = S.reports.filter(r => r.project_id == id).reverse();
+  return top + create("New daily report", `<form data-form="report" data-pid="${id}"><label class="block text-sm font-medium" for="raw">Field note</label><textarea id="raw" name="raw" required maxlength="4000" rows="4" class="input mt-1" placeholder="Framing complete on levels 3 to 5. Crew of 12. One wall failed inspection and was rebuilt."></textarea><p class="muted mt-1 text-xs">Delays, extra hours and finished milestones in the note update the schedule, the budget and invoicing proposals.</p><button class="btn btn-primary mt-3">Submit report</button></form>`) +
+    `<div class="space-y-3">${reps.map(r => { const s = r.s; return `<div class="card p-4 text-sm"><div class="muted flex gap-2 text-xs">${r.created} ${bdg("read by " + s.source)}</div><p class="mt-2 italic">"${esc(r.raw)}"</p>
+    ${s.work_completed.length ? `<p class="mt-2"><b>Work completed:</b> ${esc(s.work_completed.join("; "))}</p>` : ""}${s.delays.map(d => `<p class="mt-1 text-amber-600"><b>Delay:</b> ${esc(d.cause)}${d.tasks_affected.length ? ` (affects ${esc(d.tasks_affected.join(", "))})` : ""}</p>`).join("")}${(s.impacts || []).map(i => `<p class="mt-1 text-blue-600">${esc(i)}</p>`).join("")}${s.risks.length ? `<p class="mt-1"><b>Risks:</b> ${esc(s.risks.join("; "))}</p>` : ""}
+    ${s.milestone_complete ? `<p class="mt-1 text-emerald-600">Milestone complete: ${esc(s.milestone_name)}. An invoice is waiting in <a class="link" href="#/approvals">Approvals</a>.</p>` : ""}${s.follow_up_question ? `<p class="mt-1 text-blue-600"><b>Question:</b> ${esc(s.follow_up_question)}</p>` : ""}</div>`; }).join("") || '<p class="muted text-sm">No reports yet.</p>'}</div>`; };
+
+V.field = () => { const t = today(), repToday = S.reports.filter(r => r.created.slice(0, 10) === t), low = S.materials.filter(m => m.qty < m.min_qty), eq = s => S.equipment.filter(e => e.status === s).length;
+  const tb = S.projects.reduce((s, p) => s + p.budget, 0), ta = S.projects.reduce((s, p) => s + p.spent, 0);
+  return head("Field Operations", "Live view of sites, stock, equipment and safety.") + stats([["Active sites", S.projects.length], ["Critical issues", S.incidents.filter(i => i.severity === "Critical" && i.status !== "Closed").length], ["Pending reports", S.projects.filter(p => !repToday.some(r => r.project_id == p.id)).length], ["Reports today", repToday.length]]) +
+  sec("Active sites", tbl(["Site", "Client", "Progress", ""], S.projects.map(p => [esc(p.name), esc(cl(p.client_id).name), p.progress + "%", `<a class="link" href="#/projects/${p.id}/reports">Daily reports</a>`]))) +
+  sec("Material inventory", stats([["Materials", S.materials.length], ["Low stock alerts", low.length], ["Total value", money(S.materials.reduce((s, m) => s + m.qty * m.unit_cost, 0))]]) + (low.length ? `<div class="mt-3">${tbl(["Low stock", "Quantity", "Minimum"], low.map(m => [esc(m.name), m.qty, m.min_qty]))}</div>` : "")) +
+  sec("Equipment utilization", stats([["Total", S.equipment.length], ["Available", eq("Available")], ["In use", eq("In use")], ["Maintenance", eq("Maintenance")]])) +
+  sec("Safety", stats([["Total incidents", S.incidents.length], ["High or critical open", S.incidents.filter(i => ["High", "Critical"].includes(i.severity) && i.status !== "Closed").length], ["Pending investigations", S.incidents.filter(i => i.status !== "Closed").length]])) +
+  sec("Budget health", stats([["Total budget", money(tb)], ["Total spent", money(ta)], ["Remaining", money(tb - ta)], ["Over budget projects", S.projects.filter(p => p.spent > p.budget).length]])); };
+
+const REPORTS = {
+  materials: { t: "Materials Inventory", d: "Stock levels, value and low-stock alerts.", cols: ["Material", "Quantity", "Minimum", "Unit cost", "Value", "Status"], rows: () => S.materials.map(m => [m.name, `${m.qty} ${m.unit}`, m.min_qty, m.unit_cost, m.qty * m.unit_cost, m.qty <= 0 ? "Out of stock" : m.qty < m.min_qty ? "Low stock" : "In stock"]) },
+  equipment: { t: "Equipment Utilization", d: "Status and hourly cost of every machine.", cols: ["Name", "Type", "Status", "Hourly cost"], rows: () => S.equipment.map(e => [e.name, e.type, e.status, e.rate]) },
+  safety: { t: "Safety Incident Summary", d: "Incidents by project, severity and status.", cols: ["Date", "Project", "Incident", "Severity", "Status"], rows: () => S.incidents.map(i => [i.date, proj(i.project_id).name, i.type, i.severity, i.status]) },
+  budget: { t: "Budget Variance Analysis", d: "Contract budget against spend, by project.", cols: ["Project", "Budget", "Spent", "Remaining", "Used %", "Progress %"], rows: () => S.projects.map(p => [p.name, p.budget, p.spent, p.budget - p.spent, Math.round(p.spent / p.budget * 100), p.progress]) },
+};
+V.reports = () => head("Report Center", "Generate reports for management review.") + `<div class="grid gap-4 md:grid-cols-2">${Object.entries(REPORTS).map(([k, r]) => `<div class="card p-5"><h2 class="font-semibold">${r.t} Report</h2><p class="muted mt-1 text-sm">${r.d}</p><a href="#/reports/${k}" class="btn btn-primary mt-4">Generate report</a></div>`).join("")}</div>`;
+V.report = k => { const r = REPORTS[k]; if (!r) return "<p>Report not found.</p>";
+  return `<a href="#/reports" class="link text-sm">Back to reports</a><div class="mt-2">${head(r.t + " Report", "Generated " + now().replace("T", " "), btn("Export CSV", "export", `data-kind="${k}"`) + btn("Print", "print"))}</div>${tbl(r.cols, r.rows().map(row => row.map(esc)))}`; };
+
+V.budget = () => { const tb = S.projects.reduce((s, p) => s + p.budget, 0), ta = S.projects.reduce((s, p) => s + p.spent, 0);
+  return head("Budget", "Contract budgets, spend and category lines.") + stats([["Total budget", money(tb)], ["Total spent", money(ta)], ["Remaining", money(tb - ta)], ["Over budget", S.projects.filter(p => p.spent > p.budget).length]]) +
+  sec("By project", tbl(["Project", "Budget", "Spent", "Remaining", "Used"], S.projects.map(p => [esc(p.name), money(p.budget), money(p.spent), money(p.budget - p.spent), `<div class="w-32">${bar(p.spent / p.budget * 100, p.spent / p.budget * 100 - p.progress >= 8 ? "bg-amber-500" : "bg-emerald-500")}<span class="text-xs">${Math.round(p.spent / p.budget * 100)}%</span></div>`]))) +
+  sec("Category lines (plan to date vs actual)", create("New budget line", form("line", [["project_id", "Project", "select", () => S.projects.map(p => [p.id, p.name])], ["category", "Category", "select", ["labor", "materials", "equipment", "subs", "permits", "other"]], ["budget", "Planned to date (CAD)", "number"], ["actual", "Actual to date (CAD)", "number"]])) +
+    tbl(["Project", "Category", "Plan", "Actual", "Variance"], E.variance(S.budget_lines).map(l => [esc(proj(l.project_id).name), l.category, money(l.budget), money(l.actual), `<b class="${l.var > 0 ? "text-red-600" : "text-emerald-600"}">${l.pct}%</b>`]))); };
 
 V.approvals = () => { const a = [...S.actions].reverse();
-  return `<h1 class="text-2xl font-semibold">Approvals &amp; Audit</h1><p class="text-sm text-slate-500">Reminders run automatically. Invoices and payouts need approval; staff can approve up to ${money(CFG.staffLimit)}, admins any amount.</p>
-  <h2 class="mt-4 mb-2 font-medium">Pending</h2><div class="space-y-3">${a.filter(x => x.status === "pending").map(card).join("") || `<p class="text-sm text-slate-500">Nothing waiting.</p>`}</div>
-  <h2 class="mt-6 mb-2 font-medium">History</h2><div class="space-y-3">${a.filter(x => x.status !== "pending").map(card).join("") || `<p class="text-sm text-slate-500">No decisions yet.</p>`}</div>`; };
+  return head("Approvals", `Reminders run automatically. Invoices and payouts need approval; staff can approve up to ${money(CFG.staffLimit)}, admins any amount.`, ME.role === "admin" ? btn("Export audit log", "csv") : "") +
+  sec("Waiting", `<div class="space-y-3">${a.filter(x => x.status === "pending").map(actCard).join("") || '<p class="muted text-sm">Nothing waiting.</p>'}</div>`) + sec("History", `<div class="space-y-3">${a.filter(x => x.status !== "pending").map(actCard).join("") || '<p class="muted text-sm">No decisions yet.</p>'}</div>`); };
 
-V.timesheets = () => `<h1 class="text-2xl font-semibold">Timesheets</h1><div class="mt-4 rounded-lg border bg-white divide-y">${[...S.timesheets].reverse().map(t => `<div class="flex flex-wrap items-center gap-2 p-3 text-sm"><span>${t.work_date} · ${esc(S.users.find(u => u.id == t.user_id).name)} · ${esc(proj(t.project_id).name)} · ${t.hours} h · ${money(t.hours * t.rate)}</span><span class="ml-auto">${badge(t.status)}</span>
-  ${t.status === "submitted" ? btn("Approve", "tsapprove", `data-id="${t.id}"`) : ""}</div>`).join("")}</div>`;
-
-V.settings = () => `<h1 class="text-2xl font-semibold">Settings</h1><form data-form="settings" class="mt-4 max-w-md space-y-3 text-sm">
-  <label class="block">Staff approval limit (CAD)<input name="staffLimit" type="number" min="0" value="${CFG.staffLimit}" class="mt-1 w-full rounded-md border px-3 py-1.5"></label>
-  <label class="block">Access code (needed if the server sets ACCESS_CODE)<input name="access" value="${esc(CFG.access)}" class="mt-1 w-full rounded-md border px-3 py-1.5"></label>
-  <label class="block">Client invoice email (sandbox buyer account)<input name="clientEmail" type="email" value="${esc(S.clients[0].email)}" class="mt-1 w-full rounded-md border px-3 py-1.5"></label>
-  <label class="block">Subcontractor payout email (sandbox personal account)<input name="subEmail" type="email" value="${esc(S.users.find(u => u.role === "subcontractor").email)}" class="mt-1 w-full rounded-md border px-3 py-1.5"></label>
-  <button class="rounded-md bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700">Save</button></form>`;
-
-V.project = async id => { const p = proj(id); if (!p) return "<p>Project not found.</p>";
-  const pl = E.plan(S.tasks.filter(t => t.project_id == id)), wx = E.wxRisks(pl.tasks, await weather()), lines = E.variance(S.budget_lines.filter(l => l.project_id == id));
-  const reps = S.reports.filter(r => r.project_id == id).reverse(), why = await explain(lines, reps.slice(0, 3).flatMap(r => r.s.delays.map(d => d.cause)));
-  return `<a href="#/" class="text-sm text-blue-700 underline">Back</a><h1 class="mt-2 text-2xl font-semibold">${esc(p.name)}</h1><p class="text-sm text-slate-600">${esc(cl(p.client_id).name)} · due ${p.due}</p><p class="mt-2 max-w-2xl text-sm">${esc(p.description)}</p>
-  <div class="mt-3 text-sm">Budget ${money(p.budget)} · spent ${money(p.spent)} · progress ${p.progress}%</div>
-  <section class="mt-6"><h2 class="font-medium mb-1">Schedule</h2><p class="text-sm">Forecast finish ${pl.finish} · baseline ${pl.baseline} · <b class="${pl.slip ? "text-amber-700" : "text-emerald-700"}">${pl.slip} days behind</b></p>
-  <div class="mt-2 rounded-lg border bg-white divide-y text-sm">${pl.tasks.map(t => `<div class="flex flex-wrap gap-2 p-2"><span class="w-44">${esc(t.name)}</span><span>${t.es} to ${t.ef}</span><span>${t.progress}%</span>${t.critical ? badge("critical path", "bg-red-100 text-red-800") : ""}${t.slip ? badge("+" + t.slip + " days", "bg-amber-100 text-amber-800") : ""}</div>`).join("")}</div>
-  ${wx.map(w => `<p class="mt-2 text-sm text-amber-700">Weather risk: ${esc(w.task)} is scheduled on ${w.dates.join(", ")} (rain or freezing forecast).</p>`).join("")}</section>
-  <section class="mt-6"><h2 class="font-medium mb-1">Budget vs plan to date</h2><p class="text-sm">${esc(why)}</p><div class="mt-2 rounded-lg border bg-white divide-y text-sm">${lines.map(l => `<div class="flex justify-between p-2"><span>${l.category[0].toUpperCase() + l.category.slice(1)}</span><span>plan ${money(l.budget)} · actual ${money(l.actual)} · <b class="${l.var > 0 ? "text-red-700" : "text-emerald-700"}">${l.pct}%</b></span></div>`).join("")}</div></section>
-  <section class="mt-6"><h2 class="font-medium mb-2">New daily report</h2><form data-form="report" class="max-w-2xl"><input type="hidden" name="pid" value="${id}"><label for="raw" class="text-sm">Field note (typed or pasted)</label>
-  <textarea id="raw" name="raw" required maxlength="4000" rows="4" class="mt-1 w-full rounded-md border p-2 text-sm" placeholder="Framing complete on levels 3 to 5. Crew of 12. One wall failed inspection and was rebuilt."></textarea>
-  <button class="mt-2 rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700">Analyze with Site Agent</button></form></section>
-  <section class="mt-6"><h2 class="font-medium mb-2">Reports</h2><div class="space-y-3">${reps.map(r => { const s = r.s; return `<div class="rounded-lg border bg-white p-4 text-sm"><div class="flex gap-2 text-xs text-slate-500">${r.created} ${badge("structured by " + s.source)}</div><p class="mt-2 italic text-slate-600">"${esc(r.raw)}"</p>
-  ${s.work_completed.length ? `<p class="mt-2"><b>Work completed:</b> ${esc(s.work_completed.join("; "))}</p>` : ""}${s.delays.map(d => `<p class="mt-1 text-amber-700"><b>Delay:</b> ${esc(d.cause)}${d.tasks_affected.length ? ` (affects ${esc(d.tasks_affected.join(", "))})` : ""}</p>`).join("")}
-  ${(s.impacts || []).map(i => `<p class="mt-1 text-indigo-700">${esc(i)}</p>`).join("")}${s.risks.length ? `<p class="mt-1"><b>Risks:</b> ${esc(s.risks.join("; "))}</p>` : ""}
-  ${s.milestone_complete ? `<p class="mt-1 text-emerald-700">Milestone complete: ${esc(s.milestone_name)}. Billing Agent drafted an invoice for <a class="underline" href="#/approvals">your approval</a>.</p>` : ""}${s.follow_up_question ? `<p class="mt-1 text-blue-700"><b>Agent asks:</b> ${esc(s.follow_up_question)}</p>` : ""}</div>`; }).join("") || `<p class="text-sm text-slate-500">No reports yet.</p>`}</div></section>`; };
+V.admin = () => head("Admin", "People, approval rules, integrations and data.") +
+  sec("Users", create("New user", form("user", [["name", "Full name"], ["email", "Email", "email"], ["role", "Role", "select", ["staff", "admin", "client", "subcontractor"]], ["client_id", "Client (for client users)", "select", () => S.clients.map(c => [c.id, c.name]), 1], ["project_id", "Project (for subcontractors)", "select", () => S.projects.map(p => [p.id, p.name]), 1]], "Create user")) + tbl(["Name", "Email", "Role"], S.users.map(u => [esc(u.name), esc(u.email), st(u.role)])) + '<p class="muted mt-2 text-xs">New users sign in with the password maple123 (demo only).</p>') +
+  sec("Approval rules", `<div class="card p-5">${form("settings", [["staffLimit", "Staff approval limit (CAD)", "number"], ["access", "Access code (only if the server sets ACCESS_CODE)", "text", null, 1]], "Save").replace('name="staffLimit"', `name="staffLimit" value="${CFG.staffLimit}"`).replace('name="access"', `name="access" value="${esc(CFG.access)}"`)}</div>`) +
+  sec("Integrations", tbl(["Service", "Status"], [["PayPal", ST.paypal ? bdg("Sandbox connected", "ok") : bdg("Test mode: no PayPal keys on the server", "warn")], ["Gemini", ST.gemini ? bdg("Connected", "ok") : bdg("Not configured: built-in rules are used", "warn")]])) +
+  sec("Data", `<div class="card flex flex-wrap items-center justify-between gap-3 p-5"><p class="text-sm">All data is stored in this browser. Resetting restores the sample data.</p>${btn("Reset local data", "reset")}</div>`);
 
 V.ask = async q => { const route = await gem(`Pick one tool for this construction question. Tools: overdue, at_risk, approvals, payouts, schedule. Return JSON {"tool": string}. Question: ${q}`);
   const kw = [["overdue", "overdue"], ["owe", "overdue"], ["invoice", "overdue"], ["risk", "at_risk"], ["budget", "at_risk"], ["approv", "approvals"], ["wait", "approvals"], ["payout", "payouts"], ["pay", "payouts"], ["schedule", "schedule"], ["delay", "schedule"]];
-  const tool = route && ["overdue", "at_risk", "approvals", "payouts", "schedule"].includes(route.tool) ? route.tool : (kw.find(([k]) => q.toLowerCase().includes(k)) || [])[1];
-  const ids = myProjects().map(p => p.id); let title = "I can answer questions about overdue invoices, at-risk projects, approvals, payouts and schedule.", lines = [];
+  const tool = route && ["overdue", "at_risk", "approvals", "payouts", "schedule"].includes(route.tool) ? route.tool : (kw.find(([k]) => q.toLowerCase().includes(k)) || [])[1], ids = myProjects().map(p => p.id);
+  let title = "Try asking about overdue invoices, at-risk projects, approvals, payouts or the schedule.", lines = [];
   if (tool === "overdue" && ME.role !== "subcontractor") { title = "Overdue invoices"; lines = invs().filter(i => i.days_over > 0 && ids.includes(i.project_id)).map(i => [`${i.number}: ${money(i.amount)}, ${i.days_over} days overdue (${i.client})`, staff() ? "#/finance" : "#/"]); }
   else if (tool === "at_risk" && staff()) { title = "Projects where spend is ahead of progress"; lines = S.projects.filter(p => Math.round(p.spent / p.budget * 100) - p.progress >= 8).map(p => [`${p.name}: ${Math.round(p.spent / p.budget * 100)}% of budget used, ${p.progress}% complete`, "#/projects/" + p.id]); }
   else if (tool === "approvals" && staff()) { title = "Waiting for approval"; lines = S.actions.filter(a => a.status === "pending").map(a => [a.title, "#/approvals"]); }
   else if (tool === "payouts" && ME.role !== "client") { title = "Payouts"; lines = S.payouts.filter(p => staff() || p.user_id == ME.id).map(p => [`${money(p.amount)} (${p.status}), holdback ${money(p.holdback)}`, staff() ? "#/approvals" : "#/"]); }
   else if (tool === "schedule" && staff()) { title = "Schedule forecast"; lines = ids.map(id => { const pl = E.plan(S.tasks.filter(t => t.project_id == id)); return [`${proj(id).name}: forecast finish ${pl.finish}, ${pl.slip} days behind baseline`, "#/projects/" + id]; }); }
   else if (tool) title = "That information isn't available for your role.";
-  return `<h1 class="text-xl font-semibold">${esc(title)}</h1><p class="text-sm text-slate-500">You asked: ${esc(q)}</p><div class="mt-4 space-y-2">${lines.map(([t, l]) => `<a href="${l}" class="block rounded-lg border bg-white p-3 text-sm hover:border-blue-400">${esc(t)}</a>`).join("") || `<p class="text-sm text-slate-500">Nothing to show.</p>`}</div>`; };
+  return head(esc(title), "You asked: " + esc(q)) + `<div class="space-y-2">${lines.map(([t, l]) => `<a href="${l}" class="card block p-3 text-sm hover:border-blue-400">${esc(t)}</a>`).join("") || '<p class="muted text-sm">Nothing to show.</p>'}</div>`; };
 
 async function render() {
   const app = document.getElementById("app");
   if (!ME) { app.innerHTML = location.hash === "#/login" ? V.login() : V.landing(); return; }
-  const [path, qs] = (location.hash.slice(1) || "/").split("?"), seg = path.split("/").filter(Boolean); let body;
-  try {
-    if (!seg.length) body = staff() ? V.command() : V.portal();
-    else if (!staff() && seg[0] !== "ask") body = "<p class='text-sm'>Not allowed for your role.</p>";
-    else if (seg[0] === "finance") body = V.finance(); else if (seg[0] === "approvals") body = V.approvals(); else if (seg[0] === "timesheets") body = V.timesheets();
-    else if (seg[0] === "settings") body = ME.role === "admin" ? V.settings() : "<p class='text-sm'>Not allowed for your role.</p>";
-    else if (seg[0] === "projects") body = await V.project(+seg[1]); else if (seg[0] === "ask") body = await V.ask(decodeURIComponent(new URLSearchParams(qs).get("q") || ""));
-    else body = "<p>Not found.</p>";
-  } catch (e) { body = `<p class="text-sm text-red-700">Something went wrong: ${esc(e.message)}</p>`; }
+  const [path, qs] = (location.hash.slice(1) || "/").split("?"), s = path.split("/").filter(Boolean), r = s[0] || "", q = decodeURIComponent(new URLSearchParams(qs).get("q") || ""); let body;
+  const R = { "": V.command, finance: V.finance, field: V.field, projects: () => (s[1] ? V.project(+s[1], s[2] || "overview") : V.projects()), clients: () => V.entity("clients"), proposals: () => V.entity("proposals"), invoices: V.invoices,
+    reports: () => (s[1] ? V.report(s[1]) : V.reports()), materials: () => V.entity("materials"), equipment: () => V.entity("equipment"), safety: () => V.entity("incidents"), budget: V.budget, approvals: V.approvals, admin: () => (ME.role === "admin" ? V.admin() : "<p>Not allowed for your role.</p>"), ask: () => V.ask(q) };
+  try { body = !staff() ? (r === "" ? V.portal() : r === "ask" ? await V.ask(q) : "<p>Not allowed for your role.</p>") : R[r] ? await R[r]() : "<p>Page not found.</p>"; }
+  catch (e) { body = `<p class="text-sm text-red-600">Something went wrong: ${esc(e.message)}</p>`; }
   app.innerHTML = layout(body);
 }
 
+const pref = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const csvText = rows => rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+const download = (name, text) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "text/csv" })); a.download = name; a.click(); };
 const ACT = {
   async approve(d) { const a = S.actions.find(x => x.id == d.id); if (a.status !== "pending") return;
     if (ME.role === "staff" && (a.payload.amount || 0) > CFG.staffLimit) throw new Error(`Over the ${money(CFG.staffLimit)} staff limit: an admin must approve`); await run(a, ME.email); },
   reject(d) { const a = S.actions.find(x => x.id == d.id); if (a.kind === "payout") release(a.payload.payout_id, "rejected"); upd("actions", a.id, { status: "rejected", result: { by: ME.email }, decided: now() }); },
   async draft(d) { const inv = invs().find(i => i.id == d.id), r = await draftReminder(inv);
-    const a = logAction("Billing", "remind", inv.id, `Send reminder for ${inv.number}`, `${inv.days_over} days overdue, estimated payment probability ${inv.prob}% (heuristic). Draft by ${r.source}.`, { subject: r.subject, note: r.note });
+    const a = logAction("Billing", "remind", inv.id, `Send reminder for ${inv.number}`, `${inv.days_over} days overdue, estimated payment probability ${inv.prob}%. Draft by ${r.source}.`, { subject: r.subject, note: r.note });
     if (CFG.autoKinds.includes("remind")) await run(a, "auto (low-stakes tier)"); location.hash = "#/approvals"; },
   simpaid(d) { upd("invoices", +d.id, { status: "paid" }); onPaid(+d.id); location.hash = "#/approvals"; },
   tsapprove(d) { upd("timesheets", +d.id, { status: "approved" }); },
-  demo(d) { FORM.login({ email: d.email, password: "maple123" }); },
-  scroll() { document.getElementById("demo").scrollIntoView({ behavior: "smooth" }); },
-  sync, logout() { ME = null; put("meta", { id: 3, uid: null }); location.hash = "#/"; },
-  reset() { if (!confirm("Delete all local MaplePro data?")) return; idb.close(); indexedDB.deleteDatabase("maplepro").onsuccess = () => { location.hash = "#/"; location.reload(); }; },
-  csv() { const rows = [["id", "created", "agent", "kind", "title", "rationale", "status", "result", "decided"], ...S.actions.map(a => [a.id, a.created, a.agent, a.kind, a.title, a.rationale, a.status, JSON.stringify(a.result), a.decided])];
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n")], { type: "text/csv" })); a.download = "audit.csv"; a.click(); },
+  sync, fill(d) { document.getElementById("email").value = d.email; document.getElementById("password").value = "maple123"; document.getElementById("password").focus(); },
+  logout() { ME = null; put("meta", { id: 3, uid: null }); location.hash = "#/"; },
+  theme() { const on = document.documentElement.classList.toggle("dark"); pref("mp-theme", on ? "dark" : "light"); },
+  font() { const on = document.documentElement.classList.toggle("lg"); pref("mp-font", on ? "lg" : "md"); },
+  print() { window.print(); },
+  export(d) { const r = REPORTS[d.kind]; download(d.kind + "-report.csv", csvText([r.cols, ...r.rows()])); },
+  csv() { download("audit.csv", csvText([["id", "created", "agent", "kind", "title", "rationale", "status", "result", "decided"], ...S.actions.map(a => [a.id, a.created, a.agent, a.kind, a.title, a.rationale, a.status, JSON.stringify(a.result), a.decided])])); },
+  reset() { if (!confirm("Delete all local MaplePro data and restore the sample data?")) return; idb.close(); indexedDB.deleteDatabase("maplepro").onsuccess = () => { location.hash = "#/"; location.reload(); }; },
 };
+const KEEP = new Set(["fill", "print", "export", "csv"]);
 const FORM = {
   login(f) { const u = S.users.find(x => x.email === f.email.trim().toLowerCase());
     if (!u || f.password !== "maple123") throw new Error("Email or password is incorrect."); ME = u; put("meta", { id: 3, uid: u.id }); location.hash = "#/"; },
   ask(f) { location.hash = "#/ask?q=" + encodeURIComponent(f.q); },
-  async ts(f) { if (ME.role !== "subcontractor" || !myProjects().some(p => p.id == f.project_id)) throw new Error("Not assigned to this project");
+  create(f, ds) { const e = ENT[ds.ent], row = {}; for (const [k, , type] of e.f) { const v = f[k]; row[k] = v === undefined || v === "" ? null : type === "number" || k.endsWith("_id") ? +v : v; } add(ds.ent, { ...row, ...(e.def ? e.def() : {}) }); },
+  project(f) { const p = add("projects", { name: f.name, client_id: +f.client_id, budget: +f.budget, spent: 0, progress: 0, due: f.due, description: f.description || "", created: today() });
+    ["labor", "materials", "equipment", "subs"].forEach(category => add("budget_lines", { project_id: p.id, category, budget: 0, actual: 0 })); location.hash = "#/projects/" + p.id; },
+  invoice(f) { const p = proj(+f.project_id), n = Math.max(0, ...S.invoices.map(i => i.id)) + 100, number = `INV-${new Date().getFullYear()}-${String(n).padStart(3, "0")}`;
+    const inv = add("invoices", { number, project_id: p.id, client_id: p.client_id, amount: +f.amount, due_date: f.due_date, status: "draft", paypal_id: null });
+    logAction("Billing", "send_invoice", inv.id, `Send invoice ${number} via PayPal`, `${ME.name} created ${number} for ${money(inv.amount)} on ${p.name}.`, { amount: inv.amount, desc: f.description || "" }); },
+  task(f, ds) { const pred = f.pred ? +f.pred : null; add("tasks", { project_id: +ds.pid, name: f.name, days: Math.max(1, +f.days), pred, progress: 0, slip: 0, wx: f.wx === "Yes" ? 1 : 0, start: f.start || today() }); },
+  progress(f) { const t = upd("tasks", +f.task_id, { progress: Math.min(100, Math.max(0, +f.progress)) }), all = S.tasks.filter(x => x.project_id == t.project_id), tot = all.reduce((s, x) => s + x.days, 0);
+    upd("projects", t.project_id, { progress: Math.round(all.reduce((s, x) => s + x.days * x.progress, 0) / tot) }); },
+  hours(f, ds) { add("timesheets", { project_id: +ds.pid, user_id: +f.user_id, work_date: f.work_date, hours: +f.hours, rate: CFG.rate, status: "submitted", payout_id: null }); },
+  note(f, ds) { add("notes", { project_id: +ds.pid, text: f.text, author: ME.name, created: now().replace("T", " ") }); },
+  line(f) { add("budget_lines", { project_id: +f.project_id, category: f.category, budget: +f.budget, actual: +f.actual }); },
+  user(f) { if (S.users.some(u => u.email === f.email.trim().toLowerCase())) throw new Error("That email already exists");
+    const u = add("users", { email: f.email.trim().toLowerCase(), name: f.name, role: f.role, client_id: f.role === "client" && f.client_id ? +f.client_id : null }); if (f.role === "subcontractor" && f.project_id) add("members", { user_id: u.id, project_id: +f.project_id }); },
+  ts(f) { if (ME.role !== "subcontractor" || !myProjects().some(p => p.id == f.project_id)) throw new Error("Not assigned to this project");
     add("timesheets", { project_id: +f.project_id, user_id: ME.id, work_date: f.work_date, hours: +f.hours, rate: CFG.rate, status: "submitted", payout_id: null }); },
-  async report(f) { const p = proj(+f.pid), s = await siteAgent(f.raw.slice(0, 4000), p); s.impacts = [];
+  async report(f, ds) { const p = proj(+ds.pid), s = await siteAgent(f.raw.slice(0, 4000), p); s.impacts = [];
     if (s.delay_days && s.delays.length) { const open = S.tasks.filter(t => t.project_id == p.id && t.progress < 100), names = s.delays.flatMap(d => d.tasks_affected.map(x => x.toLowerCase()));
       const hit = open.find(t => names.some(n => t.name.toLowerCase().includes(n) || n.includes(t.name.toLowerCase()))) || open[0];
       if (hit) { upd("tasks", hit.id, { slip: hit.slip + s.delay_days }); s.impacts.push(`Schedule: ${hit.name} slips ${s.delay_days} days; finish date recalculated.`); } }
-    if (s.extra_hours) { const cost = s.extra_hours * CFG.rate, l = S.budget_lines.find(x => x.project_id == p.id && x.category === "labor"); upd("budget_lines", l.id, { actual: l.actual + cost }); upd("projects", p.id, { spent: p.spent + cost });
+    if (s.extra_hours) { const cost = s.extra_hours * CFG.rate, l = S.budget_lines.find(x => x.project_id == p.id && x.category === "labor"); if (l) upd("budget_lines", l.id, { actual: l.actual + cost }); upd("projects", p.id, { spent: p.spent + cost });
       s.impacts.push(`Budget: ${s.extra_hours} extra labor hours add ${money(cost)}.`); }
     add("reports", { project_id: p.id, raw: f.raw, s, created: now() });
     if (s.milestone_complete && s.milestone_name) { const gross = Math.round(p.budget * CFG.milestonePct), { hold, net } = E.holdbackSplit(gross, CFG.holdback);
-      logAction("Billing", "create_invoice", p.id, `Invoice milestone: ${s.milestone_name}`, `Site Agent reported '${s.milestone_name}' complete. Milestone billing ${money(gross)} less ${CFG.holdback * 100}% holdback ${money(hold)} = ${money(net)}.`, { milestone: s.milestone_name, amount: net, holdback: hold }); } },
-  settings(f) { CFG.staffLimit = +f.staffLimit || 0; CFG.access = f.access.trim(); saveCfg();
-    upd("clients", 1, { email: f.clientEmail }); const su = S.users.find(u => u.role === "subcontractor"); upd("users", su.id, { email: f.subEmail }); const cu = S.users.find(u => u.role === "client"); upd("users", cu.id, { email: f.clientEmail }); alert("Saved"); },
+      logAction("Billing", "create_invoice", p.id, `Invoice milestone: ${s.milestone_name}`, `Site report says '${s.milestone_name}' is complete. Milestone billing ${money(gross)} less ${CFG.holdback * 100}% holdback ${money(hold)} = ${money(net)}.`, { milestone: s.milestone_name, amount: net, holdback: hold }); } },
+  settings(f) { CFG.staffLimit = +f.staffLimit || 0; CFG.access = (f.access || "").trim(); saveCfg(); alert("Saved"); },
 };
 document.addEventListener("click", async e => { const b = e.target.closest("[data-act]"); if (!b) return; e.preventDefault(); b.disabled = true;
-  try { await ACT[b.dataset.act](b.dataset); } catch (err) { alert(err.message); } render(); });
+  try { await ACT[b.dataset.act](b.dataset); } catch (err) { alert(err.message); } b.disabled = false; if (!KEEP.has(b.dataset.act)) render(); });
 document.addEventListener("submit", async e => { const f = e.target.closest("[data-form]"); if (!f) return; e.preventDefault();
-  try { await FORM[f.dataset.form](Object.fromEntries(new FormData(f))); } catch (err) { alert(err.message); } render(); });
+  try { await FORM[f.dataset.form](Object.fromEntries(new FormData(f)), f.dataset); } catch (err) { alert(err.message); } render(); });
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); const q = document.getElementById("q"); if (q) q.focus(); } });
 window.addEventListener("hashchange", render);
 
 (async () => {
