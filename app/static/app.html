@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Command Center — MaplePro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="workspace-page">
+  <div class="app-shell" id="app-shell">
+    <aside class="app-sidebar" id="app-sidebar">
+      <div class="sidebar-head"><a class="brand" href="/"><span class="brand-mark">M</span><span>maplepro<span class="brand-period">.</span></span></a><button class="icon-button sidebar-close" id="sidebar-close" aria-label="Close navigation">×</button></div>
+      <button class="workspace-switcher"><span class="firm-logo">N</span><span class="workspace-switcher-text"><b>Northline Group</b><small>Construction workspace</small></span><span class="switcher-chevron">⌄</span></button>
+      <div class="sidebar-label">WORKSPACE</div>
+      <nav class="sidebar-nav" aria-label="Workspace navigation">
+        <button class="nav-item active" data-view="overview"><span class="nav-icon">◫</span><span>Command center</span><span class="nav-count" id="nav-risk-count">3</span></button>
+        <button class="nav-item" data-view="projects"><span class="nav-icon">▦</span><span>Projects</span></button>
+        <button class="nav-item" data-view="invoices"><span class="nav-icon">▤</span><span>Invoices & payments</span><span class="nav-dot" id="nav-invoice-dot"></span></button>
+        <button class="nav-item" data-view="intelligence"><span class="nav-icon">✳</span><span>AI intelligence</span><span class="nav-new">AI</span></button>
+        <button class="nav-item" data-view="reports"><span class="nav-icon">⌁</span><span>Forecasts & reports</span></button>
+      </nav>
+      <div class="sidebar-label sidebar-label-lower">MANAGE</div>
+      <nav class="sidebar-nav"><button class="nav-item" data-view="team"><span class="nav-icon">♙</span><span>People & access</span></button><button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Settings</span></button></nav>
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-help"><div class="help-spark">✦</div><strong>Clear next steps</strong><p>Turn project signals into decisions your team can act on.</p><button data-view="intelligence">Explore intelligence <span>→</span></button></div>
+      <div class="sidebar-user"><div class="user-avatar" id="sidebar-avatar">OC</div><div class="sidebar-user-info"><strong id="sidebar-name">Olivia Chen</strong><small id="sidebar-role">Project Manager</small></div><button class="icon-button sidebar-menu" id="sign-out" aria-label="Sign out">↗</button></div>
+    </aside>
+    <div class="sidebar-scrim" id="sidebar-scrim"></div>
+    <main class="app-main">
+      <header class="app-topbar">
+        <div class="topbar-left"><button class="icon-button mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button><div class="breadcrumb"><span>Northline Group</span><b>/</b><strong id="breadcrumb-current">Command center</strong></div></div>
+        <div class="topbar-actions">
+          <div class="global-search"><span class="search-icon">⌕</span><input id="global-search" type="search" placeholder="Search projects, invoices..." aria-label="Search projects and invoices"><kbd>⌘ K</kbd><div class="search-popover" id="search-popover" hidden></div></div>
+          <span class="topbar-divider"></span><div class="integration-status" id="integration-status"><span class="status-pip"></span><span>Demo environment</span></div>
+          <button class="icon-button theme-toggle" id="theme-toggle" aria-label="Toggle dark mode"><span id="theme-icon">◐</span></button>
+          <button class="topbar-avatar" id="topbar-avatar" aria-label="Current user">OC</button>
+        </div>
+      </header>
+      <div class="app-content" id="view-root" aria-live="polite"><div class="page-loading"><span class="loading-spinner"></span><p>Loading project intelligence…</p></div></div>
+      <footer class="app-footer"><span>MaplePro <b>·</b> Construction intelligence</span><span id="footer-mode">Seeded demonstration workspace</span><span>Build 0.1.0</span></footer>
+    </main>
+  </div>
+  <dialog class="app-dialog" id="invoice-dialog">
+    <form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close dialog">×</button></form>
+    <div class="dialog-header"><div class="dialog-eyebrow">PAYMENT WORKFLOW</div><h2>Create client invoice</h2><p>Create an invoice for a project and send it through PayPal Sandbox when credentials are connected.</p></div>
+    <form id="invoice-form" class="dialog-form">
+      <label for="invoice-project">Project</label><select id="invoice-project" required></select>
+      <div class="form-row"><div><label for="invoice-recipient">Bill to</label><input id="invoice-recipient" required maxlength="200" placeholder="Client name"></div><div><label for="invoice-email">Client email</label><input id="invoice-email" type="email" required placeholder="accounts@client.com"></div></div>
+      <label for="invoice-description">Invoice description</label><input id="invoice-description" required maxlength="500" value="Progress billing — construction milestone">
+      <div class="form-row"><div><label for="invoice-amount">Amount (CAD)</label><input id="invoice-amount" type="number" required min="1" step="0.01" placeholder="25000.00"></div><div><label for="invoice-due">Payment terms</label><select id="invoice-due"><option value="14">Due in 14 days</option><option value="30" selected>Due in 30 days</option><option value="45">Due in 45 days</option></select></div></div>
+      <div class="dialog-note" id="invoice-mode-note"><span>ⓘ</span><span>Demo mode records the workflow locally. No invoice email or payment is sent unless PayPal Sandbox credentials are configured.</span></div>
+      <div class="dialog-actions"><button type="button" class="button button-outline" id="cancel-invoice">Cancel</button><button class="button button-primary" type="submit" id="submit-invoice">Create invoice <span>→</span></button></div>
+    </form>
+  </dialog>
+  <dialog class="app-dialog project-dialog" id="project-dialog"></dialog>
+  <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
