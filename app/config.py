@@ -17,9 +17,26 @@ def _bool(name: str, default: bool) -> bool:
 
 class Settings:
     app_env = os.getenv("APP_ENV", "development")
-    # Demo login changes authentication only; all environments still require Supabase PostgreSQL.
+    # Demo identities are synthetic; set false to require Supabase Auth users.
     demo_mode = _bool("DEMO_MODE", True)
-    database_url = os.getenv("DATABASE_URL", "").strip()
+
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    # Public key used only by the browser for Supabase Auth.
+    supabase_anon_key = (
+        os.getenv("SUPABASE_ANON_KEY", "")
+        or os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
+    )
+    # Server-side data access uses the already-configured API key first. If the
+    # project uses a public/anon key, RLS still applies and demo access will need
+    # a server-side service/secret key. Never return this key to the browser.
+    supabase_api_key = (
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+        or os.getenv("SUPABASE_SECRET_KEY", "")
+        or os.getenv("SUPABASE_API_KEY", "")
+        or os.getenv("SUPABASE_KEY", "")
+        or os.getenv("SUPABASE_ANON_KEY", "")
+        or os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
+    )
 
     gemini_api_key = os.getenv("GEMINI_API_KEY", "")
     gemini_model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
@@ -28,9 +45,6 @@ class Settings:
     paypal_client_secret = os.getenv("PAYPAL_CLIENT_SECRET", "")
     paypal_base_url = os.getenv("PAYPAL_BASE_URL", "https://api-m.sandbox.paypal.com").rstrip("/")
     paypal_webhook_id = os.getenv("PAYPAL_WEBHOOK_ID", "")
-
-    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
-    supabase_anon_key = os.getenv("SUPABASE_ANON_KEY", "")
     firm_name = os.getenv("MAPLEPRO_FIRM_NAME", "Northline Construction Group")
 
     @property
@@ -40,6 +54,10 @@ class Settings:
     @property
     def supabase_auth_configured(self) -> bool:
         return bool(self.supabase_url and self.supabase_anon_key)
+
+    @property
+    def supabase_configured(self) -> bool:
+        return bool(self.supabase_url and self.supabase_api_key)
 
 
 settings = Settings()

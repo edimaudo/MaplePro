@@ -1,6 +1,6 @@
-# MaplePro — construction intelligence
+# MaplePro — construction decision intelligence
 
-
+A small, runnable hackathon MVP for a construction command center. It starts with seeded data, calculates transparent risk signals and trend-based forecasts, uses Gemini Flash to explain evidence when configured, and supports a PayPal Invoicing v2 sandbox workflow.
 
 ## What is implemented
 
@@ -11,7 +11,7 @@
 - **Trend-based forecasts**: project cost-at-completion and finish-date estimate using the seeded snapshot series. These are prototype estimates, not a trained or calibrated production prediction model.
 - **Gemini Flash narrative generation**: optional server-side call using `GEMINI_API_KEY` and a configurable model. If the key is absent or the API call fails, MaplePro clearly falls back to deterministic insights and does not pretend generated AI text was returned.
 - **PayPal capabilities**: create and send a PayPal Invoicing v2 invoice, send reminders for invoices that have a PayPal invoice ID, return the payer URL, and synchronize eligible invoice-paid events after server-side webhook verification.
-- **Supabase integration**: Supabase PostgreSQL is the only supported database; Supabase Auth provides email/password sign-in when demo mode is disabled, and `supabase/schema.sql` defines the tables and row-level security policies.
+- **Supabase integration**: Supabase is the only database. The FastAPI backend uses the Supabase Data API through the existing `SUPABASE_URL` and API key; it does not require a PostgreSQL connection string or SQLAlchemy. Supabase Auth provides email/password sign-in when demo mode is disabled, and `supabase/schema.sql` defines the tables and row-level security policies.
 - **Tests** for the risk-engine calculation basics.
 
 ## Run locally
@@ -26,10 +26,10 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-MaplePro **always uses Supabase PostgreSQL**, including during local development. There is no local database fallback and startup does not create tables. Before starting the app:
+MaplePro uses the Supabase Data API in every environment. There is no local database, direct PostgreSQL connection string, or ORM. Startup does not create tables. Before starting the app:
 
 1. Create a Supabase project and apply `supabase/schema.sql` in the Supabase SQL Editor.
-2. Set `DATABASE_URL` in `.env` to that project's PostgreSQL connection string, with SSL enabled.
+2. Set `SUPABASE_URL` and use the existing Supabase API key. The backend accepts `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_API_KEY`, `SUPABASE_KEY`, or the existing `SUPABASE_ANON_KEY` (in that priority order). A public anon/publishable key alone cannot read demo rows protected by authenticated-only RLS policies; if that is the key currently configured, use the project's existing server-side secret/service-role key for backend data calls. Never expose a secret/service-role key to the browser.
 3. Seed the synthetic demo records and then start FastAPI:
 
 ```bash
@@ -56,13 +56,13 @@ The demo login accepts only these seeded email identities, and only while `DEMO_
 
 ## Deploy to Vercel
 
-The `pyproject.toml` explicitly declares the runtime dependencies (including `httpx`) and configures Vercel's FastAPI entry point as `app.main:app`. Keep the Vercel project Root Directory set to this `maplepro` project folder so both `pyproject.toml` and `requirements.txt` are included in the build.
+The `pyproject.toml` declares the runtime dependencies (including `httpx`, which talks to the Supabase Data API) and configures Vercel's FastAPI entry point as `app.main:app`. Keep the Vercel project Root Directory set to this `maplepro` project folder so both `pyproject.toml` and `requirements.txt` are included in the build.
 
 `pyproject.toml` explicitly configures Vercel's FastAPI entry point as `app.main:app` because the application lives at `app/main.py`. The root-level `vercel.json` allows up to 60 seconds per request (subject to your Vercel plan limits) and explicitly bundles the HTML, CSS, and JavaScript files in `app/static/`. No catch-all rewrite is needed. The optional `$schema` property is omitted from `vercel.json`; that property is only for editor autocomplete/validation and is not a deployment URL.
 
 1. Push the contents of this `maplepro` directory to a Git repository and import that repository into Vercel. If the repository contains this project in a subdirectory, set Vercel's **Root Directory** to that subdirectory.
-2. Add the project's Supabase PostgreSQL connection string as `DATABASE_URL` in Vercel's **Project → Settings → Environment Variables**. `DATABASE_URL` is required; the application fails fast if it is missing, invalid, or points to a different database engine.
-3. Add the environment variables needed for the deployment. At minimum, configure `DATABASE_URL`. For the intended connected demo, also configure `GEMINI_API_KEY`, `GEMINI_MODEL`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_BASE_URL`, `PAYPAL_WEBHOOK_ID`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY` as applicable. Set `PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com` while testing the sandbox. Never put secret values in `vercel.json` or frontend code.
+2. Ensure `SUPABASE_URL` and the existing Supabase API key are configured in Vercel. The backend calls the Supabase Data API directly; no `DATABASE_URL` is used. For demo data under the included RLS policies, the server-side API key must have the required table permissions. If the key you already configured is a public anon/publishable key, use the project's existing server-side secret/service-role key for backend data access and keep it secret.
+3. For the intended connected demo, also configure `GEMINI_API_KEY`, `GEMINI_MODEL`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_BASE_URL`, and `PAYPAL_WEBHOOK_ID` as applicable. Set `PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com` while testing the sandbox. Never put secret values in `vercel.json` or frontend code.
 4. For a private/production deployment, set `DEMO_MODE=false` and configure Supabase Auth users plus matching profile rows as described below. `DEMO_MODE=true` enables simple demo-token login and is only suitable for a deliberately public hackathon demo with synthetic data; do not treat it as production authentication.
 5. Deploy from Vercel, then test `/`, `/login`, `/app`, `/api/health`, and `/docs`. Configure the PayPal webhook to point to `https://YOUR_DEPLOYMENT/api/webhooks/paypal` and verify its delivery in PayPal's developer dashboard.
 
@@ -104,15 +104,15 @@ In demo mode, the **Simulate** action marks a local invoice record as paid solel
 
 ## Configure Supabase
 
-Supabase PostgreSQL is required for both local development and Vercel. To configure the database and authentication:
+Supabase is required for both local development and Vercel. To configure data and authentication:
 
 1. Create a Supabase project and run `supabase/schema.sql` in the SQL Editor. This schema must be applied before starting the app; the application does not run migrations or create tables on startup.
-2. Set `DATABASE_URL` to the Supabase PostgreSQL connection string from Project Settings → Database. Use a connection string with SSL enabled, and use the Supabase pooler where appropriate for serverless workloads.
-3. Run `python scripts/seed_demo.py` from this project with `.env` configured to populate the synthetic demo firm, four demo personas, projects, snapshots, milestones, and invoices. Existing seed data is not reset.
+2. Set `SUPABASE_URL` and the existing Supabase API key in `.env` or Vercel. The app uses Supabase table endpoints for reads/writes and never expects `DATABASE_URL`. The server data key must be able to access the tables under the included RLS policies; a public anon key alone will not have access to the demo rows.
+3. Run `python scripts/seed_demo.py` to insert the synthetic firm, four demo personas, projects, snapshots, milestones, and invoices. Existing seed data is not reset.
 4. For Supabase Auth (when `DEMO_MODE=false`), create users in Supabase Auth and set each corresponding `public.profiles.auth_user_id` to that user's UUID. Keep the profile's `firm_id`, `role`, and email aligned with the user and intended access. The synthetic seed profiles have no linked Supabase Auth IDs and must be linked or replaced for real Supabase Auth sign-in.
-5. Store the PostgreSQL connection string only in the backend environment. Do not expose database credentials or any service-role/secret API key to the browser. For Supabase Auth, set `DEMO_MODE=false` together with `SUPABASE_URL` and `SUPABASE_ANON_KEY` as shown above.
+5. Never expose a service-role/secret API key to the browser. For Supabase Auth, set `DEMO_MODE=false` and configure `SUPABASE_URL` plus the public `SUPABASE_ANON_KEY`.
 
-FastAPI verifies Supabase access tokens through Supabase Auth and resolves the authorized `profiles` row before querying data. The API explicitly scopes database access by firm and role. The SQL file also enables RLS for direct Supabase API access. The backend uses a server-side PostgreSQL connection, so application-level tenant filters remain a required authorization boundary; policies evaluated under the Supabase browser JWT do not automatically constrain a separate privileged database connection.
+FastAPI verifies Supabase access tokens through Supabase Auth and resolves the authorized `profiles` row before querying data. The API explicitly scopes data by firm and role. Supabase RLS remains enabled for direct client access; server-side keys that bypass RLS must never be sent to the browser, and the FastAPI role/tenant filters are required for backend requests.
 
 ## Demo workflow
 
