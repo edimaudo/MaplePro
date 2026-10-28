@@ -114,6 +114,12 @@ Supabase is required for both local development and Vercel. To configure data an
 
 FastAPI verifies Supabase access tokens through Supabase Auth and resolves the authorized `profiles` row before querying data. The API explicitly scopes data by firm and role. Supabase RLS remains enabled for direct client access; server-side keys that bypass RLS must never be sent to the browser, and the FastAPI role/tenant filters are required for backend requests.
 
+## Fixing missing demo profiles
+
+If a demo account fails with a message saying MaplePro cannot read its profile, the `SELECT` query used to check profiles does not create them. First confirm that the query returns all four expected emails. If it does, make sure Vercel's `SUPABASE_URL` points to that exact Supabase project and that the backend uses a server-side `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SECRET_KEY`; a public anon/publishable key can return no profile rows under the included RLS policies. Update the Vercel environment variables and redeploy after changing them.
+
+If profiles are missing, run `supabase/repair_demo_profiles.sql` in that project's Supabase SQL Editor. It inserts or repairs the four demo profiles without deleting project or invoice data. The CLI seed script `python scripts/seed_demo.py` is also safe to rerun: it now repairs missing profiles and inserts missing related records even when `firm-northline` already exists. Use a server-side key with the required permissions when running it.
+
 ## Demo workflow
 
 A concise evaluation path:

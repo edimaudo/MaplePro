@@ -13,6 +13,6 @@ if __name__ == "__main__":
     check_schema()
     inserted = seed_database()
     if inserted:
-        print("Supabase demo seed completed: 8 projects, 32 invoices, milestones, snapshots, and 4 demo profiles inserted.")
+        print("Supabase demo data checked and repaired: missing demo profiles and related records were added; existing project data was preserved.")
     else:
-        print("Supabase demo data already exists; no records were changed.")
+        print("Supabase demo data is complete; no rows needed repair.")

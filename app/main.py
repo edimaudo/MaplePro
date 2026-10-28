@@ -316,7 +316,17 @@ def demo_login(body: LoginRequest):
     if body.password != _DEMO_PASSWORD:
         raise HTTPException(status_code=401, detail="The password is incorrect. Please try again.")
     if not profile:
-        raise HTTPException(status_code=503, detail="This role is listed in the sign-in page, but its profile is missing from Supabase. Run the seed script against the configured Supabase project, then retry.")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "MaplePro could not read this demo profile from the Supabase project configured in Vercel. "
+                "Check that SUPABASE_URL matches the project you inspected and that the server-side "
+                "SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is configured for demo data access. "
+                "A public anon/publishable key can return no rows under the current RLS policies. "
+                "If the profile is absent from that project, run scripts/seed_demo.py or "
+                "supabase/repair_demo_profiles.sql."
+            ),
+        )
     return {"access_token": f"demo:{profile['email']}", "token_type": "bearer", "user": {"email": profile["email"], "name": profile["full_name"], "role": profile["role"]}}
 
 

@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from .config import settings
-from .database import insert_many, rows
+from .database import insert_many, rows, one, update_one
 
 FIRM_ID = "firm-northline"
 
@@ -117,15 +117,54 @@ def build_seed_records(today: date | None = None) -> dict[str, list[dict[str, An
     return result
 
 
+def _insert_missing_by_id(table: str, records: list[dict[str, Any]]) -> int:
+    """Insert only missing IDs so a partial seed can be safely repaired."""
+    if not records:
+        return 0
+    ids = [str(record["id"]) for record in records]
+    existing = rows(table, in_filters=(("id", ids),), columns="id")
+    existing_ids = {str(record["id"]) for record in existing}
+    missing = [record for record in records if str(record["id"]) not in existing_ids]
+    insert_many(table, missing)
+    return len(missing)
+
+
+def _ensure_profiles(records: list[dict[str, Any]]) -> int:
+    """Restore demo profiles by email without overwriting a linked Auth user ID."""
+    changed = 0
+    for record in records:
+        existing = one("profiles", filters=(("email", record["email"]),), columns="id,email,firm_id,full_name,role,active")
+        if not existing:
+            existing = one("profiles", filters=(("id", record["id"]),), columns="id,email,firm_id,full_name,role,active")
+        if existing:
+            # Repair role/name/firm/email drift while preserving the row ID and auth_user_id.
+            updates = {
+                key: record[key]
+                for key in ("email", "firm_id", "full_name", "role", "active")
+                if existing.get(key) != record[key]
+            }
+            if updates:
+                update_one("profiles", str(existing["id"]), updates)
+                changed += 1
+        else:
+            insert_many("profiles", [record])
+            changed += 1
+    return changed
+
+
 def seed_database() -> bool:
-    """Insert the synthetic seed dataset once. Returns True if inserted."""
-    if rows("firms", filters=(("id", FIRM_ID),), limit=1):
-        return False
+    """Idempotently seed missing demo rows and repair missing/drifted profiles.
+
+    Unlike the old all-or-nothing check, an existing firm does not prevent the
+    remaining tables or the demo profiles from being repaired. Existing project,
+    invoice, milestone, and snapshot rows are left untouched.
+    """
     records = build_seed_records()
-    insert_many("firms", records["firms"])
-    insert_many("profiles", records["profiles"])
-    insert_many("projects", records["projects"])
-    insert_many("project_snapshots", records["project_snapshots"])
-    insert_many("milestones", records["milestones"])
-    insert_many("invoices", records["invoices"])
-    return True
+    changed = 0
+    changed += _insert_missing_by_id("firms", records["firms"])
+    changed += _ensure_profiles(records["profiles"])
+    changed += _insert_missing_by_id("projects", records["projects"])
+    changed += _insert_missing_by_id("project_snapshots", records["project_snapshots"])
+    changed += _insert_missing_by_id("milestones", records["milestones"])
+    changed += _insert_missing_by_id("invoices", records["invoices"])
+    return changed > 0
