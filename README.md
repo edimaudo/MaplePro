@@ -56,6 +56,8 @@ The demo login accepts only these seeded email identities, and only while `DEMO_
 
 ## Deploy to Vercel
 
+The `pyproject.toml` explicitly declares the runtime dependencies (including `httpx`) and configures Vercel's FastAPI entry point as `app.main:app`. Keep the Vercel project Root Directory set to this `maplepro` project folder so both `pyproject.toml` and `requirements.txt` are included in the build.
+
 `pyproject.toml` explicitly configures Vercel's FastAPI entry point as `app.main:app` because the application lives at `app/main.py`. The root-level `vercel.json` allows up to 60 seconds per request (subject to your Vercel plan limits) and explicitly bundles the HTML, CSS, and JavaScript files in `app/static/`. No catch-all rewrite is needed. The optional `$schema` property is omitted from `vercel.json`; that property is only for editor autocomplete/validation and is not a deployment URL.
 
 1. Push the contents of this `maplepro` directory to a Git repository and import that repository into Vercel. If the repository contains this project in a subdirectory, set Vercel's **Root Directory** to that subdirectory.
