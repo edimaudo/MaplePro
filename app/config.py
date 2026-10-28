@@ -17,8 +17,9 @@ def _bool(name: str, default: bool) -> bool:
 
 class Settings:
     app_env = os.getenv("APP_ENV", "development")
+    # Demo login changes authentication only; all environments still require Supabase PostgreSQL.
     demo_mode = _bool("DEMO_MODE", True)
-    database_url = os.getenv("DATABASE_URL") or f"sqlite:///{ROOT_DIR / 'maplepro.db'}"
+    database_url = os.getenv("DATABASE_URL", "").strip()
 
     gemini_api_key = os.getenv("GEMINI_API_KEY", "")
     gemini_model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")

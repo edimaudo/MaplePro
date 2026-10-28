@@ -18,7 +18,7 @@
       pills.forEach(p => p.hidden = true);
       document.querySelector('.demo-divider').hidden = true;
     } else if (config.auth_mode !== 'demo') {
-      demoHelp.textContent = 'Authentication is not configured. Set DEMO_MODE=true for local evaluation, or configure Supabase Auth and DATABASE_URL.';
+      demoHelp.textContent = 'Authentication is not configured. Configure the Supabase PostgreSQL DATABASE_URL and seed the demo data, or configure Supabase Auth for account-based sign-in.';
     }
   }).catch(() => {});
 

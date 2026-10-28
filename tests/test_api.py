@@ -1,6 +1,20 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from app.config import settings
+from app.database import parse_database_url
 from app.main import app
+
+try:
+    parse_database_url(settings.database_url)
+    _SUPABASE_DB_CONFIGURED = True
+except RuntimeError:
+    _SUPABASE_DB_CONFIGURED = False
+
+pytestmark = pytest.mark.skipif(
+    not _SUPABASE_DB_CONFIGURED,
+    reason="API integration tests require DATABASE_URL pointing to a configured Supabase PostgreSQL project.",
+)
 
 
 DEMO_PASSWORD = "MaplePro2026!"

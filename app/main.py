@@ -13,13 +13,13 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
-from .config import ROOT_DIR, settings
-from .database import Base, engine, get_db, SessionLocal
+from .config import settings
+from .database import get_db, get_engine
 from .models import Firm, UserProfile, Project, Invoice, Milestone, ProjectSnapshot, PaymentEvent
 from .risk import analyze_project
-from .seed import seed_database
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -60,10 +60,31 @@ _DEMO_PASSWORD = "MaplePro2026!"
 
 
 def init_database() -> None:
-    Base.metadata.create_all(bind=engine)
-    with SessionLocal() as db:
-        if settings.demo_mode:
-            seed_database(db)
+    """Fail fast unless the configured Supabase database and schema are ready.
+
+    Schema creation is intentionally not performed by application startup. Run
+    supabase/schema.sql once in the Supabase SQL Editor and seed data explicitly
+    with scripts/seed_demo.py.
+    """
+    db_engine = get_engine()
+    required_tables = {
+        "firms", "profiles", "projects", "invoices", "milestones",
+        "project_snapshots", "payment_events",
+    }
+    try:
+        with db_engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        inspector = inspect(db_engine)
+        missing = sorted(table for table in required_tables if not inspector.has_table(table, schema="public"))
+    except Exception as exc:
+        raise RuntimeError(
+            "Unable to connect to Supabase PostgreSQL. Check DATABASE_URL, network access, and Supabase availability."
+        ) from exc
+    if missing:
+        raise RuntimeError(
+            "The Supabase schema is incomplete. Run supabase/schema.sql in the Supabase SQL Editor; "
+            f"missing tables: {', '.join(missing)}."
+        )
 
 
 def _profile_principal(profile: UserProfile) -> Principal:
@@ -77,7 +98,7 @@ def get_principal(authorization: str | None = Header(default=None), db: Session 
         raise HTTPException(status_code=401, detail="Sign in to continue.")
     token = authorization.split(" ", 1)[1].strip()
 
-    # Explicitly limited to local demo mode; never accepted when DEMO_MODE=false.
+    # Demo identities are accepted only when DEMO_MODE=true; never accepted when DEMO_MODE=false.
     if token.startswith("demo:"):
         if not settings.demo_mode:
             raise HTTPException(status_code=401, detail="Demo sessions are disabled.")
@@ -333,7 +354,8 @@ def _current_dashboard(db: Session, principal: Principal) -> dict[str, Any]:
         "insights": _insight_cards(analyses),
         "integrations": {"gemini_configured": bool(settings.gemini_api_key), "gemini_model": settings.gemini_model,
                          "paypal_configured": settings.paypal_configured, "demo_mode": settings.demo_mode,
-                         "supabase_auth": settings.supabase_auth_configured and not settings.demo_mode},
+                         "supabase_auth": settings.supabase_auth_configured and not settings.demo_mode,
+                         "database_provider": "Supabase PostgreSQL" if settings.database_url else "Not configured"},
         "data_notice": "Seeded demonstration data. Forecasts use synthetic monthly snapshots and are not calibrated production predictions." if settings.demo_mode else "Project records and forecast assumptions should be validated before operational decisions.",
     }
 
@@ -361,6 +383,7 @@ def get_public_config():
         "supabase_anon_key": settings.supabase_anon_key if not settings.demo_mode else "",
         "demo_mode": settings.demo_mode, "gemini_configured": bool(settings.gemini_api_key),
         "gemini_model": settings.gemini_model, "paypal_configured": settings.paypal_configured,
+        "database_provider": "Supabase PostgreSQL" if settings.database_url else "Not configured",
     }
 
 
@@ -494,7 +517,7 @@ def create_invoice(body: NewInvoiceRequest, principal: Principal = Depends(get_p
     db.add(invoice)
     db.commit()
     return {"invoice": _serialize_invoice(invoice, project.name), "real_paypal": bool(paypal_id),
-            "message": "Invoice created and sent through PayPal Sandbox." if paypal_id else "Invoice added in local demo mode. No PayPal email or payment was sent.",
+            "message": "Invoice created and sent through PayPal Sandbox." if paypal_id else "Invoice added as a demo record. No PayPal email or payment was sent.",
             "payer_url": payer_url}
 
 
@@ -601,7 +624,19 @@ def search(q: str = "", principal: Principal = Depends(get_principal), db: Sessi
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "demo_mode": settings.demo_mode, "database": "configured", "paypal_configured": settings.paypal_configured, "gemini_configured": bool(settings.gemini_api_key)}
+    try:
+        with get_engine().connect() as connection:
+            connection.execute(text("SELECT 1"))
+        database_status = "connected"
+    except Exception:
+        database_status = "unavailable"
+    return {
+        "status": "ok" if database_status == "connected" else "degraded",
+        "demo_mode": settings.demo_mode,
+        "database": database_status,
+        "paypal_configured": settings.paypal_configured,
+        "gemini_configured": bool(settings.gemini_api_key),
+    }
 
 
 @app.exception_handler(Exception)
