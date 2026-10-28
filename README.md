@@ -1,6 +1,6 @@
-# MaplePro — construction decision intelligence
+# MaplePro — construction intelligence
 
-A small, runnable hackathon MVP for a construction command center. It starts with seeded data, calculates transparent risk signals and trend-based forecasts, uses Gemini Flash to explain evidence when configured, and supports a PayPal Invoicing v2 sandbox workflow.
+
 
 ## What is implemented
 
