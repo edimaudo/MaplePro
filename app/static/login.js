@@ -13,12 +13,12 @@
     config = value;
     if (config.auth_mode === 'supabase' && window.supabase) {
       supabaseClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
-      demoHelp.textContent = 'Sign in with the email and password provisioned by your MaplePro administrator.';
+      demoHelp.hidden = true;
       email.value = ''; password.value = ''; 
       pills.forEach(p => p.hidden = true);
       document.querySelector('.demo-divider').hidden = true;
     } else if (config.auth_mode !== 'demo') {
-      demoHelp.textContent = 'Authentication is not configured. Check SUPABASE_URL and the existing Supabase API key, then seed the demo data or configure Supabase Auth.';
+      demoHelp.hidden = true;
     }
   }).catch(() => {});
 

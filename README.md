@@ -1,6 +1,6 @@
 # MaplePro — construction decision intelligence
 
-A small, runnable hackathon MVP for a construction command center. It starts with seeded data, calculates transparent risk signals and trend-based forecasts, uses Gemini Flash to explain evidence when configured, and supports a PayPal Invoicing v2 sandbox workflow.
+A small, runnable hackathon MVP for a construction command center. It starts with seeded data, calculates transparent risk signals and trend-based forecasts, uses Gemini Flash to explain evidence when configured, and supports a PayPal Invoicing v2 payment workflow.
 
 ## What is implemented
 
@@ -77,7 +77,7 @@ Vercel's FastAPI deployment guidance: https://vercel.com/docs/frameworks/backend
 
 The Python risk engine owns the numbers. Gemini receives the computed metrics and may return explanation/recommendation fields; the app restricts generated insight IDs to projects visible to the signed-in user. If model configuration or quota fails, the dashboard stays available with rule-based insights.
 
-## Configure PayPal Sandbox
+## Configure PayPal
 
 1. Create a REST app in the PayPal Developer Dashboard under **Sandbox** and copy its Client ID and Secret.
 2. Add these values in `.env`:
@@ -89,7 +89,7 @@ The Python risk engine owns the numbers. Gemini receives the computed metrics an
    ```
 
 3. Restart FastAPI. In **Invoices & payments**, create a new invoice. When credentials are configured, the server gets an OAuth access token, creates a PayPal invoice, sends it, fetches its metadata, and stores the PayPal invoice ID and payer URL.
-4. Test using a PayPal Sandbox buyer account and the payer URL returned for that invoice.
+4. Test using a PayPal buyer account and the payer URL returned for that invoice.
 5. For payment status synchronization, expose the app through a public HTTPS tunnel or deployed URL, register `POST https://YOUR_HOST/api/webhooks/paypal` as the webhook URL for the same PayPal REST app, subscribe to the PayPal Invoicing v2 invoice-paid event (`INVOICING.INVOICE.PAID`), and set its webhook ID in `.env`:
 
    ```dotenv
@@ -122,8 +122,8 @@ A concise evaluation path:
 2. Sign in as `manager@maplepro.demo`.
 3. Start at **Command center** and inspect the overdue receivable and schedule/cost signals.
 4. Open **AI intelligence**. The unconfigured local app shows rule-based explanations; add a Gemini API key to demonstrate model-generated explanations.
-5. Open **Invoices & payments**, create a new invoice, then send a reminder on a seeded overdue invoice. When PayPal Sandbox credentials are not configured, these actions are clearly recorded as demo-only actions.
-6. To test the real payment path, configure PayPal Sandbox and create a *new* invoice so it has a PayPal invoice ID and payer link. Complete the payment using the Sandbox buyer and verify the webhook updates the invoice status.
+5. Open **Invoices & payments**, create a new invoice, then send a reminder on a seeded overdue invoice. When PayPal credentials are not configured, these actions are clearly recorded as demo-only actions.
+6. To test the real payment path, configure PayPal and create a *new* invoice so it has a PayPal invoice ID and payer link. Complete the payment using the Sandbox buyer and verify the webhook updates the invoice status.
 7. Sign out and enter through the Client or Subcontractor demo to inspect role-scoped project and invoice views.
 
 ## Main API routes

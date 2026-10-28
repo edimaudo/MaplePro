@@ -11,7 +11,7 @@
 <body class="workspace-page">
   <div class="app-shell" id="app-shell">
     <aside class="app-sidebar" id="app-sidebar">
-      <div class="sidebar-head"><a class="brand" href="/"><span class="brand-mark">M</span><span>maplepro<span class="brand-period">.</span></span></a><button class="icon-button sidebar-close" id="sidebar-close" aria-label="Close navigation">×</button></div>
+      <div class="sidebar-head"><a class="brand" href="/"><span class="brand-mark">M</span><span>MaplePro</span></a><button class="icon-button sidebar-close" id="sidebar-close" aria-label="Close navigation">×</button></div>
       <button class="workspace-switcher"><span class="firm-logo">N</span><span class="workspace-switcher-text"><b>Northline Group</b><small>Construction workspace</small></span><span class="switcher-chevron">⌄</span></button>
       <div class="sidebar-label">WORKSPACE</div>
       <nav class="sidebar-nav" aria-label="Workspace navigation">
@@ -44,13 +44,13 @@
   </div>
   <dialog class="app-dialog" id="invoice-dialog">
     <form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close dialog">×</button></form>
-    <div class="dialog-header"><div class="dialog-eyebrow">PAYMENT WORKFLOW</div><h2>Create client invoice</h2><p>Create an invoice for a project and send it through PayPal Sandbox when credentials are connected.</p></div>
+    <div class="dialog-header"><h2>Create client invoice</h2><p>Create an invoice for a project and send it through PayPal when connected.</p></div>
     <form id="invoice-form" class="dialog-form">
       <label for="invoice-project">Project</label><select id="invoice-project" required></select>
       <div class="form-row"><div><label for="invoice-recipient">Bill to</label><input id="invoice-recipient" required maxlength="200" placeholder="Client name"></div><div><label for="invoice-email">Client email</label><input id="invoice-email" type="email" required placeholder="accounts@client.com"></div></div>
       <label for="invoice-description">Invoice description</label><input id="invoice-description" required maxlength="500" value="Progress billing — construction milestone">
       <div class="form-row"><div><label for="invoice-amount">Amount (CAD)</label><input id="invoice-amount" type="number" required min="1" step="0.01" placeholder="25000.00"></div><div><label for="invoice-due">Payment terms</label><select id="invoice-due"><option value="14">Due in 14 days</option><option value="30" selected>Due in 30 days</option><option value="45">Due in 45 days</option></select></div></div>
-      <div class="dialog-note" id="invoice-mode-note"><span>ⓘ</span><span>Demo mode records the workflow locally. No invoice email or payment is sent unless PayPal Sandbox credentials are configured.</span></div>
+      <div class="dialog-note" id="invoice-mode-note"><span>ⓘ</span><span>Demo mode records the workflow locally. Invoice delivery and payment require PayPal to be connected.</span></div>
       <div class="dialog-actions"><button type="button" class="button button-outline" id="cancel-invoice">Cancel</button><button class="button button-primary" type="submit" id="submit-invoice">Create invoice <span>→</span></button></div>
     </form>
   </dialog>

@@ -10,7 +10,8 @@ from uuid import uuid4
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
 
@@ -290,6 +291,11 @@ def application_page():
     return FileResponse(STATIC_DIR / "app.html")
 
 
+@app.get("/404", include_in_schema=False)
+def not_found_page():
+    return FileResponse(STATIC_DIR / "404.html", status_code=404)
+
+
 @app.get("/api/config")
 def get_public_config():
     return {
@@ -307,8 +313,10 @@ def demo_login(body: LoginRequest):
     if not settings.demo_mode:
         raise HTTPException(status_code=400, detail="Demo login is disabled. Use your Supabase account.")
     profile = one("profiles", filters=(("email", str(body.email).lower()),))
-    if not profile or body.password != _DEMO_PASSWORD:
-        raise HTTPException(status_code=401, detail="Email or password is incorrect. Use a listed demo account and the demo password.")
+    if body.password != _DEMO_PASSWORD:
+        raise HTTPException(status_code=401, detail="The password is incorrect. Please try again.")
+    if not profile:
+        raise HTTPException(status_code=503, detail="This role is listed in the sign-in page, but its profile is missing from Supabase. Run the seed script against the configured Supabase project, then retry.")
     return {"access_token": f"demo:{profile['email']}", "token_type": "bearer", "user": {"email": profile["email"], "name": profile["full_name"], "role": profile["role"]}}
 
 
@@ -587,3 +595,10 @@ def health():
 async def unhandled_exception_handler(request: Request, exc: Exception):
     # Keep generic server failures from leaking credentials or stack traces to clients.
     return JSONResponse(status_code=500, content={"detail": "Unexpected server error. Check the application log."})
+
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    if request.url.path.startswith("/api/"):
+        return JSONResponse(status_code=404, content={"detail": "Not found."})
+    return FileResponse(STATIC_DIR / "404.html", status_code=404)

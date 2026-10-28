@@ -10,14 +10,13 @@
 <body class="login-page">
   <div class="login-layout">
     <aside class="login-aside">
-      <a class="brand brand-light" href="/"><span class="brand-mark">M</span><span>maplepro<span class="brand-period">.</span></span></a>
-      <div class="login-aside-copy"><div class="eyebrow eyebrow-light"><span class="pulse-dot"></span> PROJECT INTELLIGENCE</div><h1>Make the next<br>move <span>the right one.</span></h1><p>See emerging risks, understand the evidence, and keep projects moving with a clear plan of action.</p></div>
-      <div class="login-aside-footer"><div class="login-mini-stat"><strong>01</strong><span>One command center</span></div><div class="login-mini-stat"><strong>02</strong><span>Evidence-led AI</span></div><div class="login-mini-stat"><strong>03</strong><span>Connected payments</span></div><div class="login-aside-grid"></div></div>
-    </aside>
+      <a class="brand brand-light" href="/"><span class="brand-mark">M</span><span>MaplePro</span></a>
+      <div class="login-aside-copy"><h1>Make the next<br>move <span>the right one.</span></h1><p>See emerging risks, understand the evidence, and keep projects moving with a clear plan of action.</p></div>
+      </aside>
     <main class="login-main">
       <div class="login-topline"><span>Already have an account?</span><a href="/">Back to website</a></div>
       <section class="login-card">
-        <div class="login-heading"><div class="eyebrow">WELCOME TO MAPLEPRO</div><h2>Sign in to your workspace</h2><p>Access project health, invoice tracking, and your team's priorities.</p></div>
+        <div class="login-heading"><h2>Sign in to your workspace</h2><p>Access project health, invoice tracking, and your team's priorities.</p></div>
         <form id="login-form" class="login-form">
           <label for="email">Email address</label>
           <input id="email" name="email" type="email" autocomplete="username" required value="manager@maplepro.demo" placeholder="name@company.com">
@@ -33,9 +32,9 @@
           <button type="button" class="role-pill" data-email="client@maplepro.demo"><span class="role-avatar role-avatar-blue">JB</span><span><b>Client</b><small>Project & invoice visibility</small></span></button>
           <button type="button" class="role-pill" data-email="subcontractor@maplepro.demo"><span class="role-avatar role-avatar-sand">SP</span><span><b>Subcontractor</b><small>Assigned work & payment status</small></span></button>
         </div>
-        <p class="demo-help" id="demo-help">Demo password: <code>MaplePro2026!</code> <span>Seeded sample data · No real payments</span></p>
+        <p class="demo-help" id="demo-help" hidden></p>
       </section>
-      <div class="login-legal">By continuing, you agree to use this prototype with demonstration data only.</div>
+      
     </main>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
