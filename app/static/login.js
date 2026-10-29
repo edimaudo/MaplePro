@@ -59,7 +59,7 @@
         if (data.session?.refresh_token) sessionStorage.setItem('maplepro_refresh_token', data.session.refresh_token);
         if (!token) throw new Error('Supabase did not return an active session.');
       } else {
-        throw new Error('Authentication is not configured. Review the setup instructions in README.md.');
+        throw new Error('Authentication is not configured. Contact the workspace administrator.');
       }
       sessionStorage.setItem('maplepro_token', token);
       window.location.href = '/app';

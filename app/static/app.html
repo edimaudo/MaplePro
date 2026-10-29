@@ -24,22 +24,19 @@
       <div class="sidebar-label sidebar-label-lower">MANAGE</div>
       <nav class="sidebar-nav"><button class="nav-item" data-view="team"><span class="nav-icon">♙</span><span>People & access</span></button><button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Settings</span></button></nav>
       <div class="sidebar-spacer"></div>
-      <div class="sidebar-help"><div class="help-spark">✦</div><strong>Clear next steps</strong><p>Turn project signals into decisions your team can act on.</p><button data-view="intelligence">Explore intelligence <span>→</span></button></div>
-      <div class="sidebar-user"><div class="user-avatar" id="sidebar-avatar">OC</div><div class="sidebar-user-info"><strong id="sidebar-name">Olivia Chen</strong><small id="sidebar-role">Project Manager</small></div><button class="icon-button sidebar-menu" id="sign-out" aria-label="Sign out">↗</button></div>
     </aside>
     <div class="sidebar-scrim" id="sidebar-scrim"></div>
     <main class="app-main">
       <header class="app-topbar">
         <div class="topbar-left"><button class="icon-button mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button><div class="breadcrumb"><span>Northline Group</span><b>/</b><strong id="breadcrumb-current">Command center</strong></div></div>
         <div class="topbar-actions">
+          <div class="topbar-user"><span class="topbar-user-name" id="topbar-name">Olivia Chen</span><button class="topbar-signout" id="sign-out" type="button">Sign out</button></div>
+          <div class="font-size-control" aria-label="Font size"><button type="button" data-font-size="small" aria-label="Small text">A−</button><button type="button" data-font-size="medium" aria-label="Medium text">A</button><button type="button" data-font-size="large" aria-label="Large text">A+</button></div>
           <div class="global-search"><span class="search-icon">⌕</span><input id="global-search" type="search" placeholder="Search projects, invoices..." aria-label="Search projects and invoices"><kbd>⌘ K</kbd><div class="search-popover" id="search-popover" hidden></div></div>
-          <span class="topbar-divider"></span><div class="integration-status" id="integration-status"><span class="status-pip"></span><span>Demo environment</span></div>
-          <button class="icon-button theme-toggle" id="theme-toggle" aria-label="Toggle dark mode"><span id="theme-icon">◐</span></button>
-          <button class="topbar-avatar" id="topbar-avatar" aria-label="Current user">OC</button>
+          <span class="topbar-divider"></span><button class="icon-button theme-toggle" id="theme-toggle" aria-label="Toggle dark mode"><span id="theme-icon">◐</span></button>
         </div>
       </header>
       <div class="app-content" id="view-root" aria-live="polite"><div class="page-loading"><span class="loading-spinner"></span><p>Loading project intelligence…</p></div></div>
-      <footer class="app-footer"><span>MaplePro <b>·</b> Construction intelligence</span><span id="footer-mode">Seeded demonstration workspace</span><span>Build 0.1.0</span></footer>
     </main>
   </div>
   <dialog class="app-dialog" id="invoice-dialog">
@@ -50,7 +47,7 @@
       <div class="form-row"><div><label for="invoice-recipient">Bill to</label><input id="invoice-recipient" required maxlength="200" placeholder="Client name"></div><div><label for="invoice-email">Client email</label><input id="invoice-email" type="email" required placeholder="accounts@client.com"></div></div>
       <label for="invoice-description">Invoice description</label><input id="invoice-description" required maxlength="500" value="Progress billing — construction milestone">
       <div class="form-row"><div><label for="invoice-amount">Amount (CAD)</label><input id="invoice-amount" type="number" required min="1" step="0.01" placeholder="25000.00"></div><div><label for="invoice-due">Payment terms</label><select id="invoice-due"><option value="14">Due in 14 days</option><option value="30" selected>Due in 30 days</option><option value="45">Due in 45 days</option></select></div></div>
-      <div class="dialog-note" id="invoice-mode-note"><span>ⓘ</span><span>Demo mode records the workflow locally. Invoice delivery and payment require PayPal to be connected.</span></div>
+      <div class="dialog-note" id="invoice-mode-note"><span>ⓘ</span><span>Invoice delivery and payment require PayPal to be connected.</span></div>
       <div class="dialog-actions"><button type="button" class="button button-outline" id="cancel-invoice">Cancel</button><button class="button button-primary" type="submit" id="submit-invoice">Create invoice <span>→</span></button></div>
     </form>
   </dialog>

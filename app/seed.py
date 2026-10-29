@@ -125,7 +125,18 @@ def _insert_missing_by_id(table: str, records: list[dict[str, Any]]) -> int:
     existing = rows(table, in_filters=(("id", ids),), columns="id")
     existing_ids = {str(record["id"]) for record in existing}
     missing = [record for record in records if str(record["id"]) not in existing_ids]
-    insert_many(table, missing)
+    if not missing:
+        return 0
+    try:
+        insert_many(table, missing)
+    except Exception:
+        # On serverless cold starts, more than one instance can seed concurrently.
+        # Treat a conflicting insert as successful only when another instance has
+        # now created every requested row; never swallow permission/schema failures.
+        confirmed = rows(table, in_filters=(("id", [str(record["id"]) for record in missing]),), columns="id")
+        confirmed_ids = {str(record["id"]) for record in confirmed}
+        if not all(str(record["id"]) in confirmed_ids for record in missing):
+            raise
     return len(missing)
 
 
@@ -147,8 +158,17 @@ def _ensure_profiles(records: list[dict[str, Any]]) -> int:
                 update_one("profiles", str(existing["id"]), updates)
                 changed += 1
         else:
-            insert_many("profiles", [record])
-            changed += 1
+            try:
+                insert_many("profiles", [record])
+                changed += 1
+            except Exception:
+                # Multiple instances may create the same demo profile at first start.
+                # Only suppress the error if the profile now exists in the database.
+                raced = one("profiles", filters=(("email", record["email"]),), columns="id,email,firm_id,full_name,role,active")
+                if not raced:
+                    raced = one("profiles", filters=(("id", record["id"]),), columns="id,email,firm_id,full_name,role,active")
+                if not raced:
+                    raise
     return changed
 
 

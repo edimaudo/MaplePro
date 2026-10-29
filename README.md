@@ -6,7 +6,7 @@ A small, runnable hackathon MVP for a construction command center. It starts wit
 
 - **Landing page, login, and application shell** using HTML, CSS, and vanilla JavaScript. Inter is the primary font. Responsive layout and light/dark themes are included.
 - **Four demo personas**: administrator, project manager, client, and subcontractor. The sample accounts have role-specific project/invoice scopes.
-- **Explicitly seeded Supabase data**: 8 construction projects, monthly synthetic snapshots, milestones, client invoices, subcontractor invoice records, and four demo personas. Run the seed script after applying the schema.
+- **Prepopulated demo workspace**: after the Supabase schema is installed, MaplePro automatically inserts any missing demo records before the first demo login. The workspace includes 8 construction projects, 48 monthly snapshots, 32 milestones, 32 invoices, and four demo personas. Seeding is safe to rerun and preserves existing project and invoice records.
 - **Deterministic risk index**: overdue receivables, projected final-cost variance, progress-versus-plan, schedule projection, and near-term milestones.
 - **Trend-based forecasts**: project cost-at-completion and finish-date estimate using the seeded snapshot series. These are prototype estimates, not a trained or calibrated production prediction model.
 - **Gemini Flash narrative generation**: optional server-side call using `GEMINI_API_KEY` and a configurable model. If the key is absent or the API call fails, MaplePro clearly falls back to deterministic insights and does not pretend generated AI text was returned.
@@ -29,17 +29,16 @@ cp .env.example .env
 MaplePro uses the Supabase Data API in every environment. There is no local database, direct PostgreSQL connection string, or ORM. Startup does not create tables. Before starting the app:
 
 1. Create a Supabase project and apply `supabase/schema.sql` in the Supabase SQL Editor.
-2. Set `SUPABASE_URL` and use the existing Supabase API key. The backend accepts `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_API_KEY`, `SUPABASE_KEY`, or the existing `SUPABASE_ANON_KEY` (in that priority order). A public anon/publishable key alone cannot read demo rows protected by authenticated-only RLS policies; if that is the key currently configured, use the project's existing server-side secret/service-role key for backend data calls. Never expose a secret/service-role key to the browser.
-3. Seed the synthetic demo records and then start FastAPI:
+2. Set `SUPABASE_URL` and a server-side Supabase API key with read/write access to the demo tables. The backend checks `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_API_KEY`, `SUPABASE_KEY`, and then `SUPABASE_ANON_KEY` in that priority order. A public anon/publishable key alone cannot seed rows under the included RLS policies. Never expose a secret/service-role key to the browser.
+3. Start FastAPI. With `DEMO_MODE=true`, MaplePro automatically inserts any missing demo records. To manually repair the workspace, run `python scripts/seed_demo.py`.
 
 ```bash
-python scripts/seed_demo.py
 uvicorn app.main:app --reload
 ```
 
 Open `http://127.0.0.1:8000`. The landing page links to the login page; the application is served at `/app`. API documentation is at `http://127.0.0.1:8000/docs`.
 
-The seed script inserts the synthetic firm, four demo personas, projects, historical snapshots, milestones, and invoices when the firm has not already been seeded. It does not reset an existing database. `DEMO_MODE=true` controls only the demo login flow; it does not change the database backend.
+When `DEMO_MODE=true`, MaplePro automatically prepares the demo workspace on application startup and again on the first login or demo-token request when needed. The seed routine is idempotent: it inserts missing records, repairs missing profiles, and leaves existing project, invoice, milestone, and snapshot records untouched. You can still run `python scripts/seed_demo.py` manually to repair or verify the data. `DEMO_MODE=true` controls only the demo login flow; it does not change the database backend.
 
 ### Demo accounts
 
@@ -106,9 +105,9 @@ In demo mode, the **Simulate** action marks a local invoice record as paid solel
 
 Supabase is required for both local development and Vercel. To configure data and authentication:
 
-1. Create a Supabase project and run `supabase/schema.sql` in the SQL Editor. This schema must be applied before starting the app; the application does not run migrations or create tables on startup.
+1. Create a Supabase project and run `supabase/schema.sql` in the SQL Editor. The schema must be applied before starting the app; MaplePro initializes data but does not create tables or run migrations.
 2. Set `SUPABASE_URL` and the existing Supabase API key in `.env` or Vercel. The app uses Supabase table endpoints for reads/writes and never expects `DATABASE_URL`. The server data key must be able to access the tables under the included RLS policies; a public anon key alone will not have access to the demo rows.
-3. Run `python scripts/seed_demo.py` to insert the synthetic firm, four demo personas, projects, snapshots, milestones, and invoices. Existing seed data is not reset.
+3. With `DEMO_MODE=true`, MaplePro inserts any missing demo firm, personas, projects, snapshots, milestones, and invoices automatically during startup or before the first demo login. You can run `python scripts/seed_demo.py` manually if you need to repair the dataset; it does not reset existing project data.
 4. For Supabase Auth (when `DEMO_MODE=false`), create users in Supabase Auth and set each corresponding `public.profiles.auth_user_id` to that user's UUID. Keep the profile's `firm_id`, `role`, and email aligned with the user and intended access. The synthetic seed profiles have no linked Supabase Auth IDs and must be linked or replaced for real Supabase Auth sign-in.
 5. Never expose a service-role/secret API key to the browser. For Supabase Auth, set `DEMO_MODE=false` and configure `SUPABASE_URL` plus the public `SUPABASE_ANON_KEY`.
 
@@ -124,7 +123,7 @@ If profiles are missing, run `supabase/repair_demo_profiles.sql` in that project
 
 A concise evaluation path:
 
-1. Ensure `supabase/schema.sql` has been applied and `python scripts/seed_demo.py` has completed against the configured Supabase database.
+1. Ensure `supabase/schema.sql` has been applied. MaplePro prepares missing demo records automatically when the app starts or the first demo login is attempted.
 2. Sign in as `manager@maplepro.demo`.
 3. Start at **Command center** and inspect the overdue receivable and schedule/cost signals.
 4. Open **AI intelligence**. The unconfigured local app shows rule-based explanations; add a Gemini API key to demonstrate model-generated explanations.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timezone, timedelta
@@ -18,15 +19,62 @@ from pydantic import BaseModel, EmailStr, Field
 from .config import settings
 from .database import check_schema, insert_one, one, rows, update_one
 from .risk import analyze_project
+from .seed import FIRM_ID, seed_database
+
+
+_logger = logging.getLogger("maplepro")
+_demo_workspace_ready = False
+
+
+def initialize_workspace_data() -> None:
+    """Ensure the configured database has a complete demo workspace before login.
+
+    This runs at application startup and again on the first login/demo-token request
+    for hosting environments that do not emit ASGI lifespan events. The seed routine
+    inserts only missing records, preserving existing work and user changes.
+    """
+    global _demo_workspace_ready
+    if _demo_workspace_ready:
+        return
+
+    check_schema()
+    if settings.demo_mode:
+        seed_database()
+        expected = {
+            "profiles": 4,
+            "projects": 8,
+            "invoices": 32,
+            "milestones": 32,
+            "project_snapshots": 48,
+        }
+        actual = {
+            table: len(rows(table, filters=(("firm_id", FIRM_ID),), columns="id"))
+            for table in expected
+        }
+        missing = [f"{table}: expected at least {minimum}, found {actual[table]}"
+                   for table, minimum in expected.items() if actual[table] < minimum]
+        if missing:
+            raise RuntimeError(
+                "MaplePro could not finish preparing the demo workspace (" + "; ".join(missing) + "). "
+                "Check that SUPABASE_URL points to the intended project and that the server-side "
+                "Supabase API key can read and write the demo tables."
+            )
+
+    _demo_workspace_ready = True
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    check_schema()
+    try:
+        initialize_workspace_data()
+    except Exception:
+        # Keep the landing and sign-in pages available so a configuration problem
+        # can be diagnosed in the UI instead of making the entire app unavailable.
+        _logger.exception("Demo workspace initialization failed; it will be retried before login.")
     yield
 
 
-app = FastAPI(title="MaplePro API", version="0.2.0", description="Construction project intelligence and PayPal workflow prototype", lifespan=lifespan)
+app = FastAPI(title="MaplePro API", version="0.2.0", description="Construction project intelligence and PayPal workflow", lifespan=lifespan)
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -56,15 +104,6 @@ class NewInvoiceRequest(BaseModel):
 
 
 _DEMO_PASSWORD = "MaplePro2026!"
-
-
-def init_database() -> None:
-    """Check Supabase tables and confirm the seeded demo account is visible."""
-    check_schema()
-    if settings.demo_mode and not one("profiles", filters=(("email", "admin@maplepro.demo"),), columns="id,email"):
-        raise RuntimeError(
-            "MaplePro demo data is not readable. Run scripts/seed_demo.py and ensure the server-side Supabase API key has access under RLS; a public anon key alone cannot read the demo tables."
-        )
 
 
 def _as_date(value: Any) -> date:
@@ -101,6 +140,16 @@ def get_principal(authorization: str | None = Header(default=None)) -> Principal
     if token.startswith("demo:"):
         if not settings.demo_mode:
             raise HTTPException(status_code=401, detail="Demo sessions are disabled.")
+        try:
+            initialize_workspace_data()
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "MaplePro could not prepare its demo workspace. Verify the Supabase project URL, "
+                    "schema, and server-side API key read/write access."
+                ),
+            ) from exc
         email = token[5:].strip().lower()
         profile = one("profiles", filters=(("email", email),))
         if not profile:
@@ -312,9 +361,20 @@ def get_public_config():
 def demo_login(body: LoginRequest):
     if not settings.demo_mode:
         raise HTTPException(status_code=400, detail="Demo login is disabled. Use your Supabase account.")
-    profile = one("profiles", filters=(("email", str(body.email).lower()),))
     if body.password != _DEMO_PASSWORD:
         raise HTTPException(status_code=401, detail="The password is incorrect. Please try again.")
+    try:
+        initialize_workspace_data()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "MaplePro could not prepare its demo workspace. Verify the Supabase project URL, "
+                "apply supabase/schema.sql, and configure a server-side Supabase key with read/write "
+                "access to the demo tables."
+            ),
+        ) from exc
+    profile = one("profiles", filters=(("email", str(body.email).lower()),))
     if not profile:
         raise HTTPException(
             status_code=503,

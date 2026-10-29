@@ -648,3 +648,21 @@ html[data-theme="dark"] .app-dialog { --app-surface: #172435; --app-surface-soft
 .back-home-button:hover { background: #edf4fb; border-color: #a9c3df; }
 .landing-page, .landing-page * { font-family: 'Inter', Arial, sans-serif; }
 .login-page, .login-page * { font-family: 'Inter', Arial, sans-serif; }
+
+/* MaplePro workspace refinements */
+html, body, button, input, select, textarea { font-family: Inter, Arial, sans-serif !important; }
+.app-footer, .sidebar-help, .sidebar-user, .integration-status { display:none !important; }
+.topbar-user { display:flex; align-items:center; gap:10px; white-space:nowrap; color:var(--app-ink); font-size:10px; }
+.topbar-user-name { font-weight:650; }
+.topbar-signout { border:0; background:transparent; color:var(--app-muted); font-size:9px; padding:6px 8px; border-radius:6px; }
+.topbar-signout:hover { background:var(--app-surface-soft); color:var(--app-ink); }
+.font-size-control { display:flex; align-items:center; gap:2px; padding:2px; border:1px solid var(--app-line); border-radius:7px; background:var(--app-surface-soft); }
+.font-size-control button { border:0; background:transparent; color:var(--app-muted); border-radius:5px; min-width:25px; height:25px; font-size:10px; }
+.font-size-control button.active { background:var(--app-surface); color:var(--app-ink); box-shadow:0 1px 3px #0001; }
+html[data-font-size='small'] { font-size:90%; } html[data-font-size='medium'] { font-size:100%; } html[data-font-size='large'] { font-size:115%; }
+html[data-font-size='large'] .app-content { font-size:1.08em; }
+html[data-font-size='large'] .page-heading h1 { font-size:clamp(25px,2.6vw,32px); }
+html[data-font-size='small'] .app-content { font-size:.94em; }
+@media(max-width:960px){ .topbar-user-name { display:none; } .font-size-control button { min-width:22px; } }
+/* Remove decorative logos/icons from metric and insight cards */
+.stat-icon, .insight-marker, .feature-icon, .role-avatar { display:none !important; }
