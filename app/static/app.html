@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light" data-font-size="medium">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>Command Center — MaplePro</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=20261029-maplepro-ui-fix">
 </head>
 <body class="workspace-page">
   <div class="app-shell" id="app-shell">
@@ -18,7 +18,7 @@
         <button class="nav-item active" data-view="overview"><span class="nav-icon">◫</span><span>Command center</span><span class="nav-count" id="nav-risk-count">3</span></button>
         <button class="nav-item" data-view="projects"><span class="nav-icon">▦</span><span>Projects</span></button>
         <button class="nav-item" data-view="invoices"><span class="nav-icon">▤</span><span>Invoices & payments</span><span class="nav-dot" id="nav-invoice-dot"></span></button>
-        <button class="nav-item" data-view="intelligence"><span class="nav-icon">✳</span><span>AI intelligence</span><span class="nav-new">AI</span></button>
+        <button class="nav-item" data-view="intelligence"><span class="nav-icon">✳</span><span>MaplePro Intelligence</span></button>
         <button class="nav-item" data-view="reports"><span class="nav-icon">⌁</span><span>Forecasts & reports</span></button>
       </nav>
       <div class="sidebar-label sidebar-label-lower">MANAGE</div>
@@ -31,7 +31,7 @@
         <div class="topbar-left"><button class="icon-button mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button><div class="breadcrumb"><span>Northline Group</span><b>/</b><strong id="breadcrumb-current">Command center</strong></div></div>
         <div class="topbar-actions">
           <div class="topbar-user"><span class="topbar-user-name" id="topbar-name">Olivia Chen</span><button class="topbar-signout" id="sign-out" type="button">Sign out</button></div>
-          <div class="font-size-control" aria-label="Font size"><button type="button" data-font-size="small" aria-label="Small text">A−</button><button type="button" data-font-size="medium" aria-label="Medium text">A</button><button type="button" data-font-size="large" aria-label="Large text">A+</button></div>
+          <div class="font-size-control" aria-label="Font size"><button type="button" data-font-size="small" aria-label="Small text" aria-pressed="false">A−</button><button type="button" data-font-size="medium" class="active" aria-label="Default text size" aria-pressed="true">A</button><button type="button" data-font-size="large" aria-label="Large text" aria-pressed="false">A+</button></div>
           <div class="global-search"><span class="search-icon">⌕</span><input id="global-search" type="search" placeholder="Search projects, invoices..." aria-label="Search projects and invoices"><kbd>⌘ K</kbd><div class="search-popover" id="search-popover" hidden></div></div>
           <span class="topbar-divider"></span><button class="icon-button theme-toggle" id="theme-toggle" aria-label="Toggle dark mode"><span id="theme-icon">◐</span></button>
         </div>
@@ -54,6 +54,6 @@
   <dialog class="app-dialog project-dialog" id="project-dialog"></dialog>
   <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20261029-maplepro-ui-fix"></script>
 </body>
 </html>

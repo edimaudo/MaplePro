@@ -48,6 +48,20 @@
     document.getElementById('theme-icon').textContent = theme === 'dark' ? '☼' : '◐';
   }
 
+  function setFontSize(size) {
+    const allowed = ['small', 'medium', 'large'];
+    const selected = allowed.includes(size) ? size : 'medium';
+    const scale = { small: 0.92, medium: 1, large: 1.15 }[selected];
+    document.documentElement.dataset.fontSize = selected;
+    document.documentElement.style.setProperty('--font-scale', String(scale));
+    localStorage.setItem('maplepro_font_size', selected);
+    document.querySelectorAll('.font-size-control [data-font-size]').forEach(button => {
+      const active = button.dataset.fontSize === selected;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+  }
+
   function applyUser(user) {
     state.user = user;
     document.getElementById('topbar-name').textContent = `${user.name} · ${roleLabel(user.role)}`;
@@ -173,7 +187,7 @@
     const filter = `<select class="filter-select" id="invoice-status-filter" aria-label="Filter invoices"><option value="all" ${state.invoiceFilter==='all'?'selected':''}>All invoices</option><option value="overdue" ${state.invoiceFilter==='overdue'?'selected':''}>Overdue</option><option value="unpaid" ${state.invoiceFilter==='unpaid'?'selected':''}>Outstanding</option><option value="paid" ${state.invoiceFilter==='paid'?'selected':''}>Paid</option></select>`;
     const totalOutstanding = d.invoices.filter(i=>i.status!=='PAID' && i.invoice_type==='client_invoice').reduce((sum,i)=>sum+Number(i.amount),0);
     return `${pageHeader('CASH FLOW', 'Invoices & payments', 'Create invoices, follow up on outstanding balances, and reconcile payment status.', `${roleCanCreate ? '<button class="button button-primary" data-action="new-invoice">＋ Create invoice</button>' : ''}`)}
-      <div class="stats-grid"><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Outstanding amount</span><span class="stat-icon">$</span></div><div class="stat-value">${money(totalOutstanding)}</div><div class="stat-bottom">Unpaid client invoice records</div></article><article class="stat-card stat-danger"><div class="stat-card-top"><span class="stat-label">Overdue amount</span><span class="stat-icon">!</span></div><div class="stat-value">${money(d.stats.overdue_invoice_value)}</div><div class="stat-bottom">${d.stats.overdue_invoice_count} invoices past due</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Paid invoice records</span><span class="stat-icon">✓</span></div><div class="stat-value">${d.invoices.filter(i=>i.status==='PAID').length}</div><div class="stat-bottom">Payment state from local records</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">PayPal integration</span><span class="stat-icon">↗</span></div><div class="stat-value" style="font-size:19px">${state.config.paypal_configured?'Connected':'Not connected'}</div><div class="stat-bottom">${state.config.paypal_configured?'PayPal API credentials found':'Configure PayPal credentials to send actual invoices'}</div></article></div>
+      <div class="stats-grid"><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Outstanding amount</span><span class="stat-icon">$</span></div><div class="stat-value">${money(totalOutstanding)}</div><div class="stat-bottom">Unpaid client invoice records</div></article><article class="stat-card stat-danger"><div class="stat-card-top"><span class="stat-label">Overdue amount</span><span class="stat-icon">!</span></div><div class="stat-value">${money(d.stats.overdue_invoice_value)}</div><div class="stat-bottom">${d.stats.overdue_invoice_count} invoices past due</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Paid invoice records</span><span class="stat-icon">✓</span></div><div class="stat-value">${d.invoices.filter(i=>i.status==='PAID').length}</div><div class="stat-bottom">Payment state from local records</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">PayPal integration</span><span class="stat-icon">↗</span></div><div class="stat-value" style="font-size:calc(19px * var(--font-scale, 1))">${state.config.paypal_configured?'Connected':'Not connected'}</div><div class="stat-bottom">${state.config.paypal_configured?'PayPal API credentials found':'Configure PayPal credentials to send actual invoices'}</div></article></div>
       <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Invoice register</h2><p class="panel-subtitle">${d.invoices.length} invoice records visible to your role</p></div>${filter}</div>${renderInvoiceTable(invoices)}<div class="list-toolbar"><p>${state.config.demo_mode ? 'Demo actions are clearly marked and do not contact a customer.' : 'Payment changes are driven by verified provider events.'}</p></div></section>`;
   }
 
@@ -181,7 +195,7 @@
     const d = state.dashboard;
     const intel = state.intelligence || { mode:'rules_fallback', ai_generated:false, executive_summary: 'Project signals are ranked by urgency, cost exposure, schedule movement, and receivables.', insights:d.insights, notice: '' };
     const action = `<button class="button button-primary" data-action="refresh-ai">Refresh insights</button>`;
-    return `${pageHeader('DECISION SUPPORT', 'AI intelligence', 'Project insights, emerging risks, and recommended actions.', action)}
+    return `${pageHeader('DECISION SUPPORT', 'MaplePro Intelligence', 'Project insights, emerging risks, and recommended actions.', action)}
       <section class="intelligence-hero"><div><h2>${intel.ai_generated ? 'The current picture, explained.' : 'Insights from project evidence'}</h2><p>${escapeHtml(intel.executive_summary || 'Review the strongest project signals below.')}</p></div></section>
       <div class="intelligence-grid">${(intel.insights || []).length ? intel.insights.map(i => `<article class="intelligence-feature-card">${insightCardHTML(i)}<div class="recommendation-block"><b>RECOMMENDED NEXT STEP</b>${escapeHtml(i.recommendation || i.recommended_action || i.action_detail || 'Review the project details and confirm the next action.')}</div></article>`).join('') : '<section class="panel"><div class="empty-state"><strong>No elevated signals detected</strong>Rule-based indicators did not cross the configured thresholds for your current view.</div></section>'}</div>
       `;
@@ -213,7 +227,7 @@
 
   function renderView() {
     document.querySelectorAll('.nav-item[data-view]').forEach(el => el.classList.toggle('active', el.dataset.view === state.view));
-    const label = ({ overview:'Command center', projects:'Projects', invoices:'Invoices & payments', intelligence:'AI intelligence', reports:'Forecasts & reports', team:'People & access', settings:'Settings' })[state.view] || 'Command center';
+    const label = ({ overview:'Command center', projects:'Projects', invoices:'Invoices & payments', intelligence:'MaplePro Intelligence', reports:'Forecasts & reports', team:'People & access', settings:'Settings' })[state.view] || 'Command center';
     document.getElementById('breadcrumb-current').textContent = label;
     switch (state.view) {
       case 'projects': viewRoot.innerHTML = renderProjects(); break;
@@ -383,6 +397,7 @@
   });
 
   document.getElementById('theme-toggle').addEventListener('click', () => setTheme(shell.dataset.theme === 'dark' ? 'light' : 'dark'));
+  document.querySelectorAll('.font-size-control [data-font-size]').forEach(button => button.addEventListener('click', () => setFontSize(button.dataset.fontSize)));
   document.getElementById('mobile-menu').addEventListener('click', () => {
     document.getElementById('app-sidebar').classList.add('open');
     document.getElementById('sidebar-scrim').classList.add('open');

@@ -72,7 +72,7 @@ Vercel's FastAPI deployment guidance: https://vercel.com/docs/frameworks/backend
 1. Create a Gemini API key in Google AI Studio.
 2. Put the key in `.env`; never add it to frontend JavaScript or commit it.
 3. Leave `GEMINI_MODEL=gemini-3.8-flash` unless your account needs a different supported Flash model.
-4. Restart FastAPI and open **AI intelligence → Generate with Gemini Flash**.
+4. Restart FastAPI and open **MaplePro Intelligence → Refresh insights**.
 
 The Python risk engine owns the numbers. Gemini receives the computed metrics and may return explanation/recommendation fields; the app restricts generated insight IDs to projects visible to the signed-in user. If model configuration or quota fails, the dashboard stays available with rule-based insights.
 
@@ -126,7 +126,7 @@ A concise evaluation path:
 1. Ensure `supabase/schema.sql` has been applied. MaplePro prepares missing demo records automatically when the app starts or the first demo login is attempted.
 2. Sign in as `manager@maplepro.demo`.
 3. Start at **Command center** and inspect the overdue receivable and schedule/cost signals.
-4. Open **AI intelligence**. The unconfigured local app shows rule-based explanations; add a Gemini API key to demonstrate model-generated explanations.
+4. Open **MaplePro Intelligence**. The unconfigured local app shows rule-based explanations; add a Gemini API key to demonstrate model-generated explanations.
 5. Open **Invoices & payments**, create a new invoice, then send a reminder on a seeded overdue invoice. When PayPal credentials are not configured, these actions are clearly recorded as demo-only actions.
 6. To test the real payment path, configure PayPal and create a *new* invoice so it has a PayPal invoice ID and payer link. Complete the payment using the Sandbox buyer and verify the webhook updates the invoice status.
 7. Sign out and enter through the Client or Subcontractor demo to inspect role-scoped project and invoice views.
