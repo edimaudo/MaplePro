@@ -670,3 +670,87 @@ html[data-font-size='large'] .page-heading h1 { font-size:calc(clamp(25px,2.6vw,
 /* Selected text size is obvious and keyboard-accessible. */
 .font-size-control button.active { background: var(--app-blue, #2563a6) !important; color: #fff !important; box-shadow: 0 0 0 1px var(--app-blue, #2563a6); font-weight: 800; }
 .font-size-control button:focus-visible { outline: 2px solid var(--app-blue, #2563a6); outline-offset: 2px; }
+
+
+/* MaplePro refinement: clearer typography and generous intelligence layouts. */
+.workspace-page, .workspace-page * { font-family: 'Inter', Arial, sans-serif !important; }
+.workspace-page { font-feature-settings: "cv02", "cv03", "cv04", "cv11"; }
+.panel-header { align-items: flex-start; gap: 16px; padding: 20px 22px 16px; }
+.panel-title { font-size: calc(15px * var(--font-scale, 1)); line-height: 1.35; letter-spacing: -.25px; }
+.panel-subtitle { font-size: calc(13px * var(--font-scale, 1)); line-height: 1.55; }
+.panel-link { font-size: calc(12px * var(--font-scale, 1)); }
+.page-heading p { font-size: calc(14px * var(--font-scale, 1)); }
+
+/* The decorative marker is hidden elsewhere, so insight content must use the full card width. */
+.intelligence-list { padding: 0 16px 17px; gap: 12px; }
+.intelligence-list .insight-card,
+.intelligence-feature-card .insight-card { grid-template-columns: minmax(0, 1fr) !important; gap: 0; }
+.insight-card { padding: 16px 17px; border-radius: 10px; min-width: 0; }
+.insight-body { min-width: 0; width: 100%; }
+.insight-topline { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 12px; }
+.insight-topline h3 { flex: 1 1 240px; min-width: 0; font-size: calc(14px * var(--font-scale, 1)); line-height: 1.45; overflow-wrap: anywhere; }
+.priority-label { font-size: calc(11px * var(--font-scale, 1)); letter-spacing: 0; padding: 5px 7px; white-space: normal; line-height: 1.25; }
+.insight-project { margin-top: 7px; font-size: calc(12px * var(--font-scale, 1)); line-height: 1.4; }
+.insight-explanation { font-size: calc(13px * var(--font-scale, 1)); line-height: 1.65; margin: 10px 0 12px; overflow-wrap: anywhere; }
+.insight-action { font-size: calc(12px * var(--font-scale, 1)); padding: 10px 12px; line-height: 1.45; }
+.insight-action span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.confidence-note { font-size: calc(11px * var(--font-scale, 1)); line-height: 1.5; }
+.confidence-note strong { font-size: calc(11px * var(--font-scale, 1)); }
+
+.intelligence-hero { display: block; padding: 25px 27px; margin-bottom: 22px; }
+.intelligence-hero h2 { margin: 0 0 10px; font-size: calc(22px * var(--font-scale, 1)); line-height: 1.3; letter-spacing: -.55px; }
+.intelligence-hero p { max-width: 900px; font-size: calc(14px * var(--font-scale, 1)); line-height: 1.75; }
+.intelligence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
+.intelligence-feature-card { display: flex; flex-direction: column; gap: 15px; padding: 22px; min-width: 0; border-radius: 12px; }
+.intelligence-feature-card .insight-card { padding: 0; border: 0; border-radius: 0; }
+.intelligence-feature-card .insight-topline h3 { font-size: calc(15px * var(--font-scale, 1)); }
+.intelligence-feature-card .insight-explanation { font-size: calc(13px * var(--font-scale, 1)); line-height: 1.7; }
+.intelligence-feature-card .insight-action { margin-top: 2px; }
+.intelligence-feature-card .recommendation-block { margin-top: auto; padding: 15px 16px; font-size: calc(13px * var(--font-scale, 1)); line-height: 1.7; overflow-wrap: anywhere; }
+.intelligence-feature-card .recommendation-block b { font-size: calc(11px * var(--font-scale, 1)); letter-spacing: .35px; margin-bottom: 7px; }
+
+/* Forecasts & reports are split into focusable, responsive tabs. */
+.report-tabs { display: flex; align-items: stretch; gap: 5px; padding: 5px; margin: 0 0 18px; border: 1px solid var(--app-line); border-radius: 10px; background: var(--app-surface-soft); width: fit-content; max-width: 100%; }
+.report-tab { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 42px; padding: 9px 16px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--app-muted); font-size: calc(13px * var(--font-scale, 1)); font-weight: 650; white-space: nowrap; }
+.report-tab:hover { color: var(--app-ink); background: var(--app-surface); }
+.report-tab.active { color: var(--app-ink); background: var(--app-surface); border-color: var(--app-line); box-shadow: 0 1px 3px #0000000a; }
+.report-tab span { display: inline-grid; place-items: center; min-width: 22px; min-height: 22px; padding: 0 5px; border-radius: 6px; background: var(--app-surface-soft); color: var(--app-muted); font-size: calc(11px * var(--font-scale, 1)); }
+.report-tab.active span { color: var(--app-blue, #2563a6); background: var(--app-blue-soft, #edf4fa); }
+.report-panel-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(250px, .7fr); gap: 18px; align-items: start; }
+.report-panel { min-width: 0; }
+.report-panel .panel-header { padding: 21px 22px 15px; }
+.report-panel .data-table { min-width: 750px; }
+.info-callout { padding: 22px; }
+.info-callout h3 { font-size: calc(16px * var(--font-scale, 1)); line-height: 1.4; margin: 0 0 10px; }
+.info-callout p { font-size: calc(13px * var(--font-scale, 1)); line-height: 1.7; }
+.receivables-panel { display: grid; gap: 18px; }
+.receivables-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.receivables-summary .stat-card { padding: 19px 20px; }
+.receivables-value { display: block; margin-top: 12px; color: var(--app-ink); font-size: calc(23px * var(--font-scale, 1)); letter-spacing: -.5px; line-height: 1.2; }
+.receivables-caption { display: block; margin-top: 8px; color: var(--app-muted); font-size: calc(12px * var(--font-scale, 1)); line-height: 1.5; }
+.schedule-variance { color: var(--app-green); }
+.schedule-variance.late { color: var(--app-orange); }
+
+@media (max-width: 1160px) {
+  .intelligence-grid { grid-template-columns: 1fr; }
+  .report-panel-grid { grid-template-columns: minmax(0, 1.35fr) minmax(230px, .8fr); }
+}
+@media (max-width: 960px) {
+  .report-panel-grid { grid-template-columns: 1fr; }
+  .intelligence-feature-card { padding: 19px; }
+}
+@media (max-width: 700px) {
+  .intelligence-list { padding: 0 10px 11px; gap: 10px; }
+  .intelligence-list .insight-card { padding: 14px 12px; }
+  .insight-topline h3 { flex-basis: 100%; }
+  .intelligence-hero { padding: 18px; }
+  .intelligence-hero h2 { font-size: calc(19px * var(--font-scale, 1)); }
+  .intelligence-grid { grid-template-columns: 1fr; gap: 12px; }
+  .intelligence-feature-card { padding: 16px; gap: 14px; }
+  .report-tabs { width: 100%; gap: 3px; padding: 4px; }
+  .report-tab { flex: 1 1 0; min-width: 0; white-space: normal; padding: 8px 5px; gap: 5px; font-size: calc(11px * var(--font-scale, 1)); }
+  .report-tab span { min-width: 19px; min-height: 19px; font-size: calc(10px * var(--font-scale, 1)); }
+  .report-panel-grid { grid-template-columns: 1fr; }
+  .receivables-summary { grid-template-columns: 1fr; gap: 9px; }
+  .receivables-summary .stat-card { padding: 15px; }
+}

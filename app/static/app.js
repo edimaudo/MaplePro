@@ -9,7 +9,7 @@
   const projectDialog = document.getElementById('project-dialog');
   const searchInput = document.getElementById('global-search');
   const searchPopover = document.getElementById('search-popover');
-  const state = { config: {}, dashboard: null, user: null, view: 'overview', intelligence: null, searchTimer: null, projectFilter: 'all', invoiceFilter: 'all' };
+  const state = { config: {}, dashboard: null, user: null, view: 'overview', intelligence: null, searchTimer: null, projectFilter: 'all', invoiceFilter: 'all', reportTab: 'cost' };
 
   const money = value => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(Number(value || 0));
   const money2 = value => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
@@ -203,12 +203,23 @@
 
   function renderReports() {
     const projects = [...state.dashboard.projects].sort((a,b) => b.projected_variance_pct - a.projected_variance_pct);
-    const highCount = projects.filter(p=>p.projected_variance_pct>7).length;
-    const max = Math.max(1, ...projects.map(p=>p.projected_final_cost));
-    return `${pageHeader('FORECASTS & ANALYTICS', 'Forecasts & reports', 'Cost-to-complete estimates and schedule outlooks.', '<button class="button button-quiet" data-action="refresh-dashboard">↻ Recalculate</button>')}
-      <div class="section-grid"><section class="panel"><div class="panel-header"><div><h2 class="panel-title">Forecast final cost by project</h2><p class="panel-subtitle">Current cost vs projected cost at completion</p></div><span class="priority-count">${highCount} above 7% variance</span></div><div class="forecast-chart"><div class="forecast-legend"><span><i></i> Current actual cost</span><span><i class="plan"></i> Forecast final cost</span></div>${projects.map(p=>`<div class="forecast-row"><div class="forecast-project"><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(p.code)} · budget ${money(p.budget)}</small></div><div class="forecast-stacks"><div class="forecast-stack"><span class="actual" style="width:${Math.min(100,p.actual_cost/max*100)}%"></span></div><div class="forecast-stack"><span class="forecast" style="width:${Math.min(100,p.projected_final_cost/max*100)}%"></span></div></div><div class="forecast-value">${money(p.projected_final_cost)}<small>${p.projected_variance_pct>0?'+':''}${p.projected_variance_pct.toFixed(1)}%</small></div></div>`).join('')}</div></section>
-      <aside class="info-callout"><div class="page-kicker">HOW TO READ THIS</div><h3>Forecast ≠ certainty</h3><p>MaplePro projects final cost from cost-to-progress ratios and committed costs. Schedule estimates extrapolate observed progress velocity across recorded project history.</p><div class="info-metric"><span>Projects included</span><strong>${projects.length}</strong></div><div class="info-metric"><span>Average progress</span><strong>${pct(state.dashboard.stats.avg_progress)}</strong></div><div class="info-metric"><span>Elevated risk</span><strong>${state.dashboard.stats.high_risk_projects}</strong></div></aside></div>
-      <section class="panel" style="margin-top:16px"><div class="panel-header"><div><h2 class="panel-title">Schedule outlook</h2><p class="panel-subtitle">Predicted finish dates compared with current targets</p></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Project</th><th>Progress</th><th>Target finish</th><th>Estimated finish</th><th>Schedule variance</th><th>Signal confidence</th></tr></thead><tbody>${[...projects].sort((a,b)=>b.schedule_slip_days-a.schedule_slip_days).map(p=>`<tr><td><span class="table-primary">${escapeHtml(p.name)}</span><span class="table-secondary">${escapeHtml(p.code)}</span></td><td>${pct(p.progress_pct)}</td><td>${fullDate(p.target_completion)}</td><td>${fullDate(p.predicted_finish)}</td><td><span class="table-primary" style="color:${p.schedule_slip_days>10?'var(--app-orange)':'var(--app-green)'}">${p.schedule_slip_days>0?`+${p.schedule_slip_days} days`:`${p.schedule_slip_days} days`}</span></td><td>${p.confidence_score}%</td></tr>`).join('')}</tbody></table></div></section>`;
+    const highCount = projects.filter(p => p.projected_variance_pct > 7).length;
+    const scheduleRiskCount = projects.filter(p => Number(p.schedule_slip_days || 0) > 10).length;
+    const max = Math.max(1, ...projects.map(p => Number(p.projected_final_cost || 0)));
+    const invoices = [...state.dashboard.invoices];
+    const openInvoices = invoices.filter(i => i.status !== 'PAID').sort((a,b) => Number(b.overdue_days || 0) - Number(a.overdue_days || 0) || String(a.due_date || '').localeCompare(String(b.due_date || '')));
+    const tab = ['cost','schedule','receivables'].includes(state.reportTab) ? state.reportTab : 'cost';
+    const tabButton = (id, label, count = null) => `<button type="button" class="report-tab${tab === id ? ' active' : ''}" role="tab" id="report-tab-${id}" aria-selected="${tab === id}" aria-controls="report-panel-${id}" tabindex="${tab === id ? 0 : -1}" data-report-tab="${id}">${label}${count === null ? '' : `<span>${count}</span>`}</button>`;
+    let panelContent = '';
+    if (tab === 'cost') {
+      panelContent = `<div class="report-panel-grid" role="tabpanel" id="report-panel-cost" aria-labelledby="report-tab-cost"><section class="panel report-panel"><div class="panel-header"><div><h2 class="panel-title">Forecast final cost by project</h2><p class="panel-subtitle">Compare recorded spending with projected final cost.</p></div><span class="priority-count">${highCount} above 7% variance</span></div><div class="forecast-chart"><div class="forecast-legend"><span><i></i> Current actual cost</span><span><i class="plan"></i> Forecast final cost</span></div>${projects.length ? projects.map(p => `<div class="forecast-row"><div class="forecast-project"><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(p.code)} · Budget ${money(p.budget)}</small></div><div class="forecast-stacks"><div class="forecast-stack" aria-label="Actual cost"><span class="actual" style="width:${Math.min(100,Number(p.actual_cost || 0)/max*100)}%"></span></div><div class="forecast-stack" aria-label="Forecast final cost"><span class="forecast" style="width:${Math.min(100,Number(p.projected_final_cost || 0)/max*100)}%"></span></div></div><div class="forecast-value">${money(p.projected_final_cost)}<small>${Number(p.projected_variance_pct)>0?'+':''}${Number(p.projected_variance_pct || 0).toFixed(1)}%</small></div></div>`).join('') : '<div class="empty-state">No project cost forecasts are available.</div>'}</div></section><aside class="info-callout"><h3>Cost forecast summary</h3><p>Use the forecast as an early indicator of likely final cost, then validate it against current commitments and change orders.</p><div class="info-metric"><span>Projects included</span><strong>${projects.length}</strong></div><div class="info-metric"><span>Average progress</span><strong>${pct(state.dashboard.stats.avg_progress)}</strong></div><div class="info-metric"><span>Above 7% variance</span><strong>${highCount}</strong></div></aside></div>`;
+    } else if (tab === 'schedule') {
+      const scheduled = [...projects].sort((a,b) => Number(b.schedule_slip_days || 0) - Number(a.schedule_slip_days || 0));
+      panelContent = `<section class="panel report-panel" role="tabpanel" id="report-panel-schedule" aria-labelledby="report-tab-schedule"><div class="panel-header"><div><h2 class="panel-title">Schedule outlook</h2><p class="panel-subtitle">Compare predicted finish dates with current targets.</p></div><span class="priority-count">${scheduleRiskCount} over 10 days late</span></div>${scheduled.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Project</th><th>Progress</th><th>Target finish</th><th>Estimated finish</th><th>Schedule variance</th><th>Signal confidence</th></tr></thead><tbody>${scheduled.map(p => `<tr><td><span class="table-primary">${escapeHtml(p.name)}</span><span class="table-secondary">${escapeHtml(p.code)}</span></td><td>${pct(p.progress_pct)}</td><td>${fullDate(p.target_completion)}</td><td>${fullDate(p.predicted_finish)}</td><td><span class="table-primary schedule-variance${Number(p.schedule_slip_days)>10?' late':''}">${Number(p.schedule_slip_days)>0?`+${p.schedule_slip_days} days`:`${p.schedule_slip_days || 0} days`}</span></td><td>${p.confidence_score}%</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty-state">No schedule forecasts are available.</div>'}</section>`;
+    } else {
+      panelContent = `<div role="tabpanel" class="receivables-panel" id="report-panel-receivables" aria-labelledby="report-tab-receivables"><div class="receivables-summary"><article class="stat-card"><span class="stat-label">Outstanding amount</span><strong class="receivables-value">${money(state.dashboard.stats.outstanding_invoices)}</strong><span class="receivables-caption">Unpaid invoices</span></article><article class="stat-card stat-danger"><span class="stat-label">Overdue amount</span><strong class="receivables-value">${money(state.dashboard.stats.overdue_invoice_value)}</strong><span class="receivables-caption">${state.dashboard.stats.overdue_invoice_count} invoices past due</span></article><article class="stat-card"><span class="stat-label">Open invoices</span><strong class="receivables-value">${openInvoices.length}</strong><span class="receivables-caption">Awaiting payment</span></article></div><section class="panel report-panel"><div class="panel-header"><div><h2 class="panel-title">Open receivables</h2><p class="panel-subtitle">Unpaid client invoices, ordered by overdue days and due date.</p></div></div>${renderInvoiceTable(openInvoices)}</section></div>`;
+    }
+    return `${pageHeader('FORECASTS & ANALYTICS', 'Forecasts & reports', 'Review cost, schedule, and receivables in separate views.', '<button class="button button-quiet" data-action="refresh-dashboard">↻ Recalculate</button>')}<div class="report-tabs" role="tablist" aria-label="Forecast and report categories">${tabButton('cost','Cost forecast',projects.length)}${tabButton('schedule','Schedule outlook',scheduleRiskCount)}${tabButton('receivables','Receivables',openInvoices.length)}</div>${panelContent}`;
   }
 
   function renderTeam() {
@@ -389,6 +400,8 @@
     if (searchProject) { event.preventDefault(); searchPopover.hidden = true; searchInput.value = ''; navigate('projects'); openProjectDialog(searchProject.dataset.id); return; }
     const searchInvoice = event.target.closest('[data-action="search-invoice"]');
     if (searchInvoice) { event.preventDefault(); searchPopover.hidden = true; searchInput.value = ''; state.invoiceFilter = 'all'; navigate('invoices'); requestAnimationFrame(() => document.querySelector(`[data-invoice-row="${CSS.escape(searchInvoice.dataset.id)}"]`)?.scrollIntoView({ behavior:'smooth', block:'center' })); return; }
+    const reportTab = event.target.closest('[data-report-tab]');
+    if (reportTab) { state.reportTab = reportTab.dataset.reportTab; renderView(); return; }
     const nav = event.target.closest('[data-view]');
     if (nav) { navigate(nav.dataset.view); return; }
     const actionEl = event.target.closest('[data-action]');
@@ -424,6 +437,21 @@
   viewRoot.addEventListener('change', event => {
     if (event.target.id === 'project-risk-filter') { state.projectFilter = event.target.value; renderView(); }
     if (event.target.id === 'invoice-status-filter') { state.invoiceFilter = event.target.value; renderView(); }
+  });
+  viewRoot.addEventListener('keydown', event => {
+    if (!event.target.matches('.report-tab')) return;
+    const tabs = [...viewRoot.querySelectorAll('.report-tab')];
+    const current = tabs.indexOf(event.target);
+    let next = current;
+    if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
+    else if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    state.reportTab = tabs[next].dataset.reportTab;
+    renderView();
+    viewRoot.querySelector(`.report-tab[data-report-tab="${state.reportTab}"]`)?.focus();
   });
   searchInput.addEventListener('input', () => {
     clearTimeout(state.searchTimer);
