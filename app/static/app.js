@@ -143,23 +143,46 @@
     return `<div class="portfolio-health">${small ? '' : `<div class="portfolio-summary"><span><b>${projects.length} projects</b> in this workspace</span><span>Sorted by highest risk</span></div>`}${items.map(p => `<div class="health-row"><button class="health-project-button" data-action="view-project" data-id="${escapeHtml(p.id)}"><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.code)} · ${escapeHtml(p.stage)}</small></button><div class="progress-track" aria-label="${pct(p.progress_pct)} complete"><span style="width:${Math.min(100,Math.max(0,p.progress_pct))}%"></span></div><span class="project-progress">${pct(p.progress_pct)}</span>${riskChip(p.risk_level)}</div>`).join('')}</div>`;
   }
 
-  function renderCashBars(invoices) {
-    const months = [];
+  function cashFlowMonths(invoices) {
     const today = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const label = d.toLocaleDateString('en-CA', { month: 'short' });
-      months.push({ label, year: d.getFullYear(), month: d.getMonth(), total: 0 });
+    const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const months = [];
+    // Show two completed months, the current month, and three forward months.
+    for (let offset = -2; offset <= 3; offset++) {
+      const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1);
+      months.push({
+        label: date.toLocaleDateString('en-CA', { month: 'short' }),
+        year: date.getFullYear(), month: date.getMonth(), received: 0, due: 0,
+      });
     }
-    invoices.filter(inv => inv.status === 'PAID').forEach(inv => {
-      const d = new Date(`${inv.issued_date}T12:00:00`);
-      const found = months.find(m => m.year === d.getFullYear() && m.month === d.getMonth());
-      if (found) found.total += Number(inv.amount || 0);
+    const clientInvoices = invoices.filter(invoice => invoice.invoice_type === 'client_invoice');
+    clientInvoices.forEach(invoice => {
+      const paid = String(invoice.status || '').toUpperCase() === 'PAID';
+      if (paid) {
+        // Use the actual payment timestamp, not the invoice issue date.
+        if (!invoice.paid_at) return;
+        const paidDate = new Date(invoice.paid_at);
+        const bucket = months.find(month => month.year === paidDate.getFullYear() && month.month === paidDate.getMonth());
+        if (bucket) bucket.received += Number(invoice.amount || 0);
+        return;
+      }
+      if (!invoice.due_date) return;
+      const dueDate = new Date(`${String(invoice.due_date).slice(0, 10)}T12:00:00`);
+      // Carry overdue receivables into the current month instead of plotting them in the past.
+      const dueMonth = dueDate < today ? currentMonth : new Date(dueDate.getFullYear(), dueDate.getMonth(), 1);
+      const bucket = months.find(month => month.year === dueMonth.getFullYear() && month.month === dueMonth.getMonth());
+      if (bucket) bucket.due += Number(invoice.amount || 0);
     });
-    const max = Math.max(1, ...months.map(m => m.total));
-    return `<div class="cash-bars">${months.map((m,i) => `<div class="cash-month"><div class="cash-month-bar ${i === months.length - 1 ? 'current' : ''}" style="height:${Math.max(8, (m.total/max)*72)}%" title="${escapeHtml(m.label)} · ${money(m.total)}"></div><small>${escapeHtml(m.label)}</small></div>`).join('')}</div>`;
+    return months;
   }
 
+  function renderCashBars(invoices) {
+    const months = cashFlowMonths(invoices);
+    const max = Math.max(1, ...months.flatMap(month => [month.received, month.due]));
+    const bar = (value, kind, label) => `<span class="cash-month-bar ${kind}" style="height:${value > 0 ? Math.max(4, value / max * 100) : 0}%" title="${escapeHtml(label)}: ${money(value)}" aria-label="${escapeHtml(label)}: ${money(value)}"></span>`;
+    const chart = months.map(month => `<div class="cash-month"><div class="cash-month-bars">${bar(month.received, 'received', `${month.label} payments received`)}${bar(month.due, 'due', `${month.label} outstanding due`)}</div><small>${escapeHtml(month.label)}</small></div>`).join('');
+    return `<div class="cash-flow-legend"><span><i class="received"></i> Payments received</span><span><i class="due"></i> Outstanding invoices due</span></div><div class="cash-bars" role="img" aria-label="Six month cash flow view. Blue bars show payments received by payment date. Orange bars show outstanding client invoices by due date, with overdue balances carried into the current month.">${chart}</div><p class="cash-chart-note">Past-due client invoices are included in the current month’s outstanding amount. Amounts in CAD.</p>`;
+  }
   function renderMilestones(milestones) {
     if (!milestones.length) return '<div class="empty-state">No upcoming milestones in this view.</div>';
     return `<div class="milestone-list">${milestones.slice(0,6).map(m => `<div class="milestone-row"><span class="milestone-icon ${m.status === 'At risk' ? 'warn' : ''}">${m.status === 'At risk' ? '!' : '◷'}</span><div><strong>${escapeHtml(m.title)}</strong><small>${escapeHtml(m.project_name)}</small></div><span class="milestone-date">${shortDate(m.planned_date)}</span></div>`).join('')}</div>`;
@@ -200,7 +223,9 @@
     } else if (selected === 'projects') {
       panel = `<section class="panel workspace-tab-panel" role="tabpanel" id="overview-panel-projects" aria-labelledby="overview-tab-projects"><div class="panel-header"><div><h2 class="panel-title">Project health</h2><p class="panel-subtitle">Recorded progress and risk across your portfolio.</p></div><button class="panel-link" data-view="projects">All projects →</button></div>${renderPortfolio(d.projects, false)}</section>`;
     } else if (selected === 'cash') {
-      panel = `<section class="cash-card workspace-tab-panel" role="tabpanel" id="overview-panel-cash" aria-labelledby="overview-tab-cash"><div class="panel-header"><div><h2 class="panel-title">Cash collected</h2><p class="panel-subtitle">Paid invoice records by issue month.</p></div><button class="panel-link" data-view="invoices">Invoices →</button></div><div class="cash-value">${money(d.invoices.filter(i => i.status === 'PAID').reduce((sum,i) => sum + Number(i.amount),0))}</div><div class="cash-caption">From invoices in your current view.</div>${renderCashBars(d.invoices)}<div class="cash-legend"><span><i></i> Recorded paid invoices</span><span>CAD</span></div></section>`;
+      const cashMonths = cashFlowMonths(d.invoices);
+      const receivedInView = cashMonths.reduce((sum, month) => sum + month.received, 0);
+      panel = `<section class="cash-card workspace-tab-panel" role="tabpanel" id="overview-panel-cash" aria-labelledby="overview-tab-cash"><div class="panel-header"><div><h2 class="panel-title">Cash flow outlook</h2><p class="panel-subtitle">Client payments received and outstanding invoices due by month.</p></div><button class="panel-link" data-view="invoices">Invoices →</button></div><div class="cash-value">${money(receivedInView)}</div><div class="cash-caption">Payments received in the six-month view</div>${renderCashBars(d.invoices)}</section>`;
     } else if (selected === 'milestones') {
       panel = `<section class="panel workspace-tab-panel" role="tabpanel" id="overview-panel-milestones" aria-labelledby="overview-tab-milestones"><div class="panel-header"><div><h2 class="panel-title">Upcoming milestones</h2><p class="panel-subtitle">Next scheduled project checkpoints.</p></div><button class="panel-link" data-view="projects">View projects →</button></div>${renderMilestones(d.milestones)}</section>`;
     } else {
@@ -237,7 +262,6 @@
     const totalOutstanding = d.invoices.filter(i=>i.status!=='PAID' && i.invoice_type==='client_invoice').reduce((sum,i)=>sum+Number(i.amount),0);
     return `${pageHeader('CASH FLOW', 'Invoices & payments', 'Create invoices, follow up on outstanding balances, and reconcile payment status.', `${roleCanCreate ? '<button class="button button-primary" data-action="new-invoice">＋ Create invoice</button>' : ''}`)}
       <div class="stats-grid"><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Outstanding amount</span><span class="stat-icon">$</span></div><div class="stat-value">${money(totalOutstanding)}</div><div class="stat-bottom">Unpaid client invoice records</div></article><article class="stat-card stat-danger"><div class="stat-card-top"><span class="stat-label">Overdue amount</span><span class="stat-icon">!</span></div><div class="stat-value">${money(d.stats.overdue_invoice_value)}</div><div class="stat-bottom">${d.stats.overdue_invoice_count} invoices past due</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Paid invoice records</span><span class="stat-icon">✓</span></div><div class="stat-value">${d.invoices.filter(i=>i.status==='PAID').length}</div><div class="stat-bottom">Payment state from provider and recorded events</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">PayPal integration</span><span class="stat-icon">↗</span></div><div class="stat-value" style="font-size:calc(19px * var(--font-scale, 1))">${state.config.paypal_configured?'Configured':'Not configured'}</div><div class="stat-bottom">${state.config.paypal_configured?'Invoice delivery credentials are configured':'PayPal must be configured to send invoices and collect payments'}</div></article></div>
-      <section class="panel paypal-workflow-panel"><div class="panel-header"><div><h2 class="panel-title">How PayPal is used</h2><p class="panel-subtitle">Invoice delivery, client checkout, and payment reconciliation.</p></div><span class="status-pill ${state.config.paypal_configured ? 'complete' : 'draft'}">${state.config.paypal_configured ? 'Configured' : 'Setup required'}</span></div><div class="paypal-workflow-inline"><div><strong>Invoice delivery</strong><p>${state.config.paypal_configured ? 'New invoices are created and sent through PayPal.' : 'PayPal is not connected, so invoices are only recorded in MaplePro.'}</p></div><div><strong>Client payment</strong><p>${state.config.paypal_configured ? 'Clients receive a PayPal invoice link to complete payment.' : 'A PayPal payment link is not available until credentials are configured.'}</p></div><div><strong>Payment updates</strong><p>${state.config.paypal_webhook_configured ? 'Verified PayPal payment events update invoice status.' : 'Automatic payment status updates require the PayPal webhook.'}</p></div></div></section>
       <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Invoice register</h2><p class="panel-subtitle">${invoices.length} invoice records visible to your role</p></div>${filter}</div>${projectScope}${renderInvoiceTable(pageInvoices)}${pagination}</section>`;
   }
 
@@ -285,7 +309,7 @@
     } else {
       panelContent = `<div role="tabpanel" class="receivables-panel" id="report-panel-receivables" aria-labelledby="report-tab-receivables"><div class="receivables-summary"><article class="stat-card"><span class="stat-label">Outstanding amount</span><strong class="receivables-value">${money(state.dashboard.stats.outstanding_invoices)}</strong><span class="receivables-caption">Unpaid invoices</span></article><article class="stat-card stat-danger"><span class="stat-label">Overdue amount</span><strong class="receivables-value">${money(state.dashboard.stats.overdue_invoice_value)}</strong><span class="receivables-caption">${state.dashboard.stats.overdue_invoice_count} invoices past due</span></article><article class="stat-card"><span class="stat-label">Open invoices</span><strong class="receivables-value">${openInvoices.length}</strong><span class="receivables-caption">Awaiting payment</span></article></div><section class="panel report-panel"><div class="panel-header"><div><h2 class="panel-title">Open receivables</h2><p class="panel-subtitle">Unpaid client invoices, ordered by overdue days and due date.</p></div></div>${renderInvoiceTable(openInvoices)}</section></div>`;
     }
-    return `${pageHeader('FORECASTS & ANALYTICS', 'Forecasts & reports', 'Review cost, schedule, and receivables in separate views.', '<button class="button button-quiet" data-action="refresh-dashboard">↻ Recalculate</button>')}<div class="report-tabs" role="tablist" aria-label="Forecast and report categories">${tabButton('cost','Cost forecast',projects.length)}${tabButton('schedule','Schedule outlook',scheduleRiskCount)}${tabButton('receivables','Receivables',openInvoices.length)}</div>${panelContent}`;
+    return `${pageHeader('FORECASTS & ANALYTICS', 'Forecasts & reports', 'Review cost, schedule, and receivables in separate views.', '')}<div class="report-tabs" role="tablist" aria-label="Forecast and report categories">${tabButton('cost','Cost forecast',projects.length)}${tabButton('schedule','Schedule outlook',scheduleRiskCount)}${tabButton('receivables','Receivables',openInvoices.length)}</div>${panelContent}`;
   }
 
   function renderTeam() {
@@ -296,29 +320,10 @@
     return `${pageHeader('ACCESS CONTROL', 'People & access', 'Manage the people and roles in your construction workspace.', '')}<div class="team-grid">${users.map(u=>`<article class="team-card"><span class="role-avatar ${u[3]}">${u[2]}</span><h3>${escapeHtml(u[0])}</h3><span class="status-pill complete">${escapeHtml(u[1])}</span></article>`).join('')}</div><section class="panel" style="margin-top:16px"><div class="panel-header"><div><h2 class="panel-title">Authorization model</h2><p class="panel-subtitle">UI controls supplement API-side checks and firm-scoped data access.</p></div></div><div class="settings-list"><div class="settings-row"><div><strong>Administrator</strong><p>Firm-wide projects, invoices, analytics, and role visibility.</p></div><span class="settings-value">Full firm scope</span></div><div class="settings-row"><div><strong>Project manager</strong><p>Project oversight and invoice workflow for the firm.</p></div><span class="settings-value">Operational scope</span></div><div class="settings-row"><div><strong>Client</strong><p>Projects and client invoices addressed to that account.</p></div><span class="settings-value">Client email scope</span></div><div class="settings-row"><div><strong>Subcontractor</strong><p>Assigned projects and its own subcontractor invoice records.</p></div><span class="settings-value">Assignment scope</span></div></div></section>`;
   }
 
-  function renderSettings() {
-    const connected = Boolean(state.dashboard.integrations?.paypal_configured);
-    const webhookConnected = Boolean(state.dashboard.integrations?.paypal_webhook_configured);
-    const status = !connected ? 'Not configured' : webhookConnected ? 'Invoice and payment sync configured' : 'Invoice delivery configured';
-    const detail = !connected
-      ? 'MaplePro can track invoice records, but it is not currently sending invoices through PayPal or synchronizing payments. The workspace owner must connect PayPal before external invoice delivery and payment collection can begin.'
-      : webhookConnected
-        ? 'New client invoices are created and sent through PayPal. Clients pay through the PayPal invoice page, and verified payment events update invoice status in MaplePro.'
-        : 'New client invoices are created and sent through PayPal, and clients can pay through the PayPal invoice page. Automatic payment status updates are not active until the PayPal webhook is configured.';
-    return `${pageHeader('SETTINGS', 'Settings', 'Review how client billing and payment processing work.', '')}
-      <section class="panel paypal-setup-panel"><div class="panel-header"><div><h2 class="panel-title">PayPal invoicing and payments</h2><p class="panel-subtitle">The payment workflow used by MaplePro.</p></div><span class="status-pill ${connected ? 'complete' : 'draft'}">${status}</span></div>
-        <p class="paypal-setup-summary">${detail}</p>
-        <div class="paypal-workflow-grid">
-          <article><span class="paypal-step-number">01</span><h3>Issue an invoice</h3><p>${connected ? 'MaplePro creates the client invoice in PayPal and sends it to the recipient.' : 'When PayPal is connected, MaplePro creates and sends the client invoice through PayPal.'}</p></article>
-          <article><span class="paypal-step-number">02</span><h3>Collect payment</h3><p>${connected ? 'The client opens the secure PayPal invoice page and completes payment.' : 'The client receives a PayPal payment page once invoice delivery is connected.'}</p></article>
-          <article><span class="paypal-step-number">03</span><h3>Reconcile status</h3><p>${webhookConnected ? 'PayPal sends a verified payment event and MaplePro updates the invoice to Paid.' : 'Automatic Paid status updates require the PayPal webhook to be configured.'}</p></article>
-        </div>
-      </section>`;
-  }
 
   function renderView() {
     document.querySelectorAll('.nav-item[data-view]').forEach(el => el.classList.toggle('active', el.dataset.view === state.view));
-    const label = ({ overview:'Command center', projects:'Projects', invoices:'Invoices & payments', intelligence:'MaplePro Intelligence', reports:'Forecasts & reports', team:'People & access', settings:'Settings' })[state.view] || 'Command center';
+    const label = ({ overview:'Command center', projects:'Projects', invoices:'Invoices & payments', intelligence:'MaplePro Intelligence', reports:'Forecasts & reports', team:'People & access' })[state.view] || 'Command center';
     document.getElementById('breadcrumb-current').textContent = label;
     switch (state.view) {
       case 'projects': viewRoot.innerHTML = renderProjects(); break;
@@ -326,7 +331,6 @@
       case 'intelligence': viewRoot.innerHTML = renderIntelligence(); break;
       case 'reports': viewRoot.innerHTML = renderReports(); break;
       case 'team': viewRoot.innerHTML = renderTeam(); break;
-      case 'settings': viewRoot.innerHTML = renderSettings(); break;
       default: viewRoot.innerHTML = renderOverview();
     }
   }

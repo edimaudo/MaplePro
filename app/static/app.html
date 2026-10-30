@@ -6,22 +6,21 @@
   <title>Command Center — MaplePro</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=20261030-reminders-replan-paypal">
+  <link rel="stylesheet" href="/static/styles.css?v=20261030-navigation-chart-buttons">
 </head>
 <body class="workspace-page">
   <div class="app-shell" id="app-shell">
     <aside class="app-sidebar" id="app-sidebar">
       <div class="sidebar-head"><a class="brand" href="/"><span class="brand-mark">M</span><span>MaplePro</span></a><button class="icon-button sidebar-close" id="sidebar-close" aria-label="Close navigation">×</button></div>
-      <div class="sidebar-label">WORKSPACE</div>
-      <nav class="sidebar-nav" aria-label="Workspace navigation">
-        <button class="nav-item active" data-view="overview"><span class="nav-icon">◫</span><span>Command center</span><span class="nav-count" id="nav-risk-count">3</span></button>
-        <button class="nav-item" data-view="projects"><span class="nav-icon">▦</span><span>Projects</span></button>
-        <button class="nav-item" data-view="invoices"><span class="nav-icon">▤</span><span>Invoices & payments</span><span class="nav-dot" id="nav-invoice-dot"></span></button>
-        <button class="nav-item" data-view="intelligence"><span class="nav-icon">✳</span><span>MaplePro Intelligence</span></button>
-        <button class="nav-item" data-view="reports"><span class="nav-icon">⌁</span><span>Forecasts & reports</span></button>
+      <nav class="sidebar-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="overview"><span>Command center</span><span class="nav-count" id="nav-risk-count">3</span></button>
+        <button class="nav-item" data-view="projects"><span>Projects</span></button>
+        <button class="nav-item" data-view="invoices"><span>Invoices & payments</span><span class="nav-dot" id="nav-invoice-dot"></span></button>
+        <button class="nav-item" data-view="intelligence"><span>MaplePro Intelligence</span></button>
+        <button class="nav-item" data-view="reports"><span>Forecasts & reports</span></button>
       </nav>
       <div class="sidebar-label sidebar-label-lower">MANAGE</div>
-      <nav class="sidebar-nav"><button class="nav-item" data-view="team"><span class="nav-icon">♙</span><span>People & access</span></button><button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Settings</span></button></nav>
+      <nav class="sidebar-nav"><button class="nav-item" data-view="team"><span>People & access</span></button></nav>
       <div class="sidebar-spacer"></div>
     </aside>
     <div class="sidebar-scrim" id="sidebar-scrim"></div>
@@ -55,6 +54,6 @@
   <dialog class="app-dialog replan-dialog" id="replan-dialog"></dialog>
   <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/static/app.js?v=20261030-reminders-replan-paypal"></script>
+  <script src="/static/app.js?v=20261030-navigation-chart-buttons"></script>
 </body>
 </html>

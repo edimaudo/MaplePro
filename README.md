@@ -126,7 +126,7 @@ A concise evaluation path:
 2. Sign in as `manager@maplepro.demo`.
 3. Start at **Command center** and inspect the overdue receivable and schedule/cost signals.
 4. Open **MaplePro Intelligence**. The unconfigured local app shows rule-based explanations; add a Gemini API key to demonstrate model-generated explanations.
-5. Open **Invoices & payments**, create a new invoice, then prepare an editable reminder for an outstanding invoice. The page shows whether PayPal invoice delivery and payment-status synchronization are configured.
+5. Open **Invoices & payments**, create a new invoice, then prepare an editable reminder for an outstanding invoice. The invoice page shows whether PayPal invoice delivery is configured. Payment status is updated from verified PayPal webhook events when the webhook is configured.
 6. To test the real payment path, configure PayPal and create a *new* invoice so it has a PayPal invoice ID and payer link. Complete the payment using the Sandbox buyer and verify the webhook updates the invoice status.
 7. Sign out and enter through the Client or Subcontractor demo to inspect role-scoped project and invoice views.
 

@@ -128,14 +128,17 @@ def test_workspace_switcher_and_technical_database_labels_are_removed():
     assert "Connected services" not in js
 
 
-def test_paypal_workflow_is_explained_in_business_language():
+def test_settings_destination_and_redundant_paypal_explainer_are_removed():
+    html = (ROOT / "app" / "static" / "app.html").read_text()
     js = (ROOT / "app" / "static" / "app.js").read_text()
-    assert "How PayPal is used" in js
-    assert "Invoice delivery" in js
-    assert "Client payment" in js
-    assert "Payment updates" in js
-    assert "PayPal invoicing and payments" in js
-    assert "When PayPal is connected, MaplePro creates and sends the client invoice through PayPal." in js
+    assert 'data-view="settings"' not in html
+    assert "function renderSettings()" not in js
+    assert "case 'settings'" not in js
+    assert "How PayPal is used" not in js
+    assert "paypal-workflow-panel" not in js
+    assert "paypal-setup-panel" not in js
+    # PayPal's availability remains visible in the invoice workflow's status metric.
+    assert "PayPal integration" in js
 
 
 def test_critical_path_action_opens_editable_milestone_planner():
@@ -173,7 +176,8 @@ def test_paypal_webhook_status_is_distinct_from_invoice_credentials():
     main = (ROOT / "app" / "main.py").read_text()
     js = (ROOT / "app" / "static" / "app.js").read_text()
     assert '"paypal_webhook_configured": bool(settings.paypal_webhook_id)' in main
-    assert "state.config.paypal_webhook_configured" in js
+    assert "state.config.paypal_webhook_configured" not in js
+    assert "paypal_webhook_configured" in main
 
 
 
@@ -182,3 +186,38 @@ def test_reminder_and_milestone_actions_are_restricted_to_managers_in_insights()
     assert "const canManageProject = ['admin','project_manager'].includes(state.user?.role)" in js
     assert "insight.invoice_id && canManageProject" in js
     assert "isCriticalPath && canManageProject" in js
+
+
+def test_reports_do_not_show_a_recalculate_action():
+    js = (ROOT / "app" / "static" / "app.js").read_text()
+    reports = js[js.index("function renderReports()"):js.index("function renderTeam()")]
+    assert "Recalculate" not in reports
+    assert "data-action=\"refresh-dashboard\"" not in reports
+
+
+def test_sidebar_has_no_decorative_icons_or_workspace_label():
+    html = (ROOT / "app" / "static" / "app.html").read_text()
+    sidebar = html[html.index('<aside class="app-sidebar"'):html.index('</aside>')]
+    assert 'class="nav-icon"' not in sidebar
+    assert '>WORKSPACE<' not in sidebar
+    assert 'data-view="settings"' not in sidebar
+
+
+def test_cash_flow_chart_uses_received_and_outstanding_series_with_meaningful_dates():
+    js = (ROOT / "app" / "static" / "app.js").read_text()
+    chart = js[js.index("function cashFlowMonths"):js.index("function renderMilestones")]
+    assert "invoice.paid_at" in chart
+    assert "invoice.due_date" in chart
+    assert "Payments received" in chart
+    assert "Outstanding invoices due" in chart
+    assert "issue month" not in chart
+
+
+def test_shared_app_buttons_have_light_and_dark_theme_tokens():
+    css = (ROOT / "app" / "static" / "styles.css").read_text()
+    assert "--app-button-outline-text" in css
+    assert "--app-button-primary: #2563a6" in css
+    assert "--app-button-outline-text: #e7eff9" in css
+    assert "html[data-theme=\"dark\"] .app-dialog" in css
+    assert ".app-shell .button-outline" in css
+    assert ".app-dialog .button-outline" in css

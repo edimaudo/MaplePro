@@ -809,15 +809,7 @@ html[data-theme="dark"] .dialog-close-form .icon-button { color:#f3f7fc; backgro
 }
 
 
-/* Payment workflow and milestone replanning. */
-.paypal-setup-panel, .paypal-workflow-panel { margin-bottom:16px; }
-.paypal-setup-summary { margin:0 20px 18px; max-width:920px; color:var(--app-muted); line-height:1.65; font-size:calc(13px * var(--font-scale, 1)); }
-.paypal-workflow-grid, .paypal-workflow-inline { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:0 20px 20px; }
-.paypal-workflow-grid article, .paypal-workflow-inline > div { min-width:0; padding:15px; border:1px solid var(--app-line); border-radius:9px; background:var(--app-surface-soft); }
-.paypal-step-number { display:inline-flex; align-items:center; justify-content:center; width:27px; height:27px; border-radius:7px; background:var(--app-blue-soft, #edf4fa); color:var(--app-blue, #2563a6); font-size:12px; font-weight:700; }
-.paypal-workflow-grid h3, .paypal-workflow-inline strong { display:block; margin:11px 0 5px; color:var(--app-ink); font-size:calc(13px * var(--font-scale, 1)); }
-.paypal-workflow-grid p, .paypal-workflow-inline p { margin:0; color:var(--app-muted); font-size:calc(12px * var(--font-scale, 1)); line-height:1.55; }
-.paypal-workflow-inline strong { margin:0 0 5px; }
+/* Milestone replanning. */
 .reminder-help { margin:0; color:var(--app-muted); font-size:calc(12px * var(--font-scale, 1)); line-height:1.5; }
 .replan-dialog { width:min(850px, calc(100vw - 28px)); max-width:850px; }
 .replan-dialog .dialog-header { padding-right:66px; }
@@ -829,8 +821,148 @@ html[data-theme="dark"] .dialog-close-form .icon-button { color:#f3f7fc; backgro
 .replan-table-wrap input[type=date] { min-width:145px; padding:8px; border:1px solid var(--app-line); border-radius:7px; background:var(--app-surface); color:var(--app-ink); font:inherit; }
 .replan-dialog .dialog-actions { padding:0 20px 20px; }
 @media (max-width:760px) {
-  .paypal-workflow-grid, .paypal-workflow-inline { grid-template-columns:1fr; padding-left:12px; padding-right:12px; }
-  .paypal-setup-summary { margin-left:12px; margin-right:12px; }
   .replan-note, .replan-table-wrap { margin-left:12px; margin-right:12px; }
   .replan-dialog .dialog-actions { padding-left:12px; padding-right:12px; }
+}
+
+/* Shared, theme-aware application button system. */
+.app-shell {
+  --app-button-primary: #2563a6;
+  --app-button-primary-hover: #174b82;
+  --app-button-outline-bg: #ffffff;
+  --app-button-outline-text: #30445a;
+  --app-button-outline-border: #cbd6e2;
+  --app-button-outline-hover: #edf4fb;
+  --app-button-quiet-bg: #f4f8fd;
+  --app-button-quiet-text: #52667b;
+  --app-button-focus: #6da9e3;
+}
+.app-shell[data-theme="dark"] {
+  --app-button-outline-bg: #172435;
+  --app-button-outline-text: #e7eff9;
+  --app-button-outline-border: #52677f;
+  --app-button-outline-hover: #263b52;
+  --app-button-quiet-bg: #1d2c40;
+  --app-button-quiet-text: #d1ddec;
+  --app-button-focus: #8cbcf0;
+}
+.app-dialog {
+  --app-button-primary: #2563a6;
+  --app-button-primary-hover: #174b82;
+  --app-button-outline-bg: #ffffff;
+  --app-button-outline-text: #30445a;
+  --app-button-outline-border: #cbd6e2;
+  --app-button-outline-hover: #edf4fb;
+  --app-button-quiet-bg: #f4f8fd;
+  --app-button-quiet-text: #52667b;
+  --app-button-focus: #6da9e3;
+}
+html[data-theme="dark"] .app-dialog {
+  --app-button-outline-bg: #172435;
+  --app-button-outline-text: #e7eff9;
+  --app-button-outline-border: #52677f;
+  --app-button-outline-hover: #263b52;
+  --app-button-quiet-bg: #1d2c40;
+  --app-button-quiet-text: #d1ddec;
+  --app-button-focus: #8cbcf0;
+}
+.app-shell .button,
+.app-dialog .button {
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-family: 'Inter', Arial, sans-serif !important;
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 650;
+  line-height: 1.25;
+  box-shadow: none;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.app-shell .button.button-sm,
+.app-dialog .button.button-sm { min-height: 36px; padding: 8px 11px; }
+.app-shell .button-primary,
+.app-dialog .button-primary {
+  color: #ffffff;
+  background: var(--app-button-primary, #2563a6);
+  border-color: var(--app-button-primary, #2563a6);
+}
+.app-shell .button-primary:hover,
+.app-dialog .button-primary:hover {
+  color: #ffffff;
+  background: var(--app-button-primary-hover, #174b82);
+  border-color: var(--app-button-primary-hover, #174b82);
+}
+.app-shell .button-outline,
+.app-dialog .button-outline {
+  color: var(--app-button-outline-text);
+  background: var(--app-button-outline-bg);
+  border: 1px solid var(--app-button-outline-border);
+}
+.app-shell .button-outline:hover,
+.app-dialog .button-outline:hover {
+  color: var(--app-button-outline-text);
+  background: var(--app-button-outline-hover);
+  border-color: var(--app-button-outline-border);
+}
+.app-shell .button-quiet,
+.app-dialog .button-quiet {
+  color: var(--app-button-quiet-text);
+  background: var(--app-button-quiet-bg);
+  border: 1px solid var(--app-line);
+}
+.app-shell .button-quiet:hover,
+.app-dialog .button-quiet:hover {
+  color: var(--app-ink);
+  background: var(--app-button-outline-hover);
+  border-color: var(--app-button-outline-border);
+}
+.app-shell .button:focus-visible,
+.app-dialog .button:focus-visible {
+  outline: 2px solid var(--app-button-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.app-shell .button:disabled,
+.app-dialog .button:disabled { opacity: .55; cursor: not-allowed; }
+
+/* The sidebar uses text navigation only; counts and status dots remain informative. */
+.app-sidebar .nav-item { gap: 0; padding-left: 12px; padding-right: 12px; }
+.app-sidebar .nav-item .nav-count,
+.app-sidebar .nav-item .nav-dot { margin-left: auto; }
+.app-sidebar .nav-icon { display: none !important; }
+
+/* Cash-flow comparison: client receipts versus open receivables by month. */
+.cash-flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 22px;
+  padding: 13px 18px 2px;
+  color: var(--app-muted);
+  font-size: calc(11px * var(--font-scale, 1));
+}
+.cash-flow-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.cash-flow-legend i { width: 9px; height: 9px; display: inline-block; border-radius: 2px; flex: 0 0 auto; }
+.cash-flow-legend i.received { background: #3479bd; }
+.cash-flow-legend i.due { background: #d58a4c; }
+.cash-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  height: 158px;
+  margin-top: 5px;
+  padding: 13px 18px 9px;
+  border-bottom: 1px solid var(--app-line);
+}
+.cash-month { display: grid; grid-template-rows: minmax(0, 1fr) auto; justify-items: center; gap: 8px; flex: 1 1 0; min-width: 0; height: 100%; }
+.cash-month-bars { display: flex; align-items: end; justify-content: center; gap: 4px; width: 100%; height: 100%; min-height: 0; }
+.cash-month-bar { display: block; width: min(40%, 22px); min-width: 5px; max-height: 100%; min-height: 0; border-radius: 4px 4px 1px 1px; transition: height .2s ease; }
+.cash-month-bar.received { background: #3479bd; }
+.cash-month-bar.due { background: #d58a4c; }
+.cash-month small { color: var(--app-muted); font-size: calc(10px * var(--font-scale, 1)); line-height: 1.2; }
+.cash-chart-note { margin: 0; padding: 9px 18px 14px; color: var(--app-muted); font-size: calc(10px * var(--font-scale, 1)); line-height: 1.5; }
+@media (max-width: 700px) {
+  .cash-bars { height: 140px; gap: 5px; padding-left: 12px; padding-right: 12px; }
+  .cash-flow-legend { gap: 9px 14px; padding-left: 13px; padding-right: 13px; }
+  .cash-chart-note { padding-left: 13px; padding-right: 13px; }
 }
