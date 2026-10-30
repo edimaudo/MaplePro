@@ -43,5 +43,5 @@ def test_demo_workspace_fails_clearly_if_seed_did_not_populate_data(monkeypatch)
 
     monkeypatch.setattr(main, "rows", empty_rows)
 
-    with pytest.raises(RuntimeError, match="could not finish preparing the demo workspace"):
+    with pytest.raises(RuntimeError, match="could not finish preparing the workspace"):
         main.initialize_workspace_data()

@@ -5,20 +5,26 @@
   const errorBox = document.getElementById('login-error');
   const submit = document.getElementById('login-submit');
   const pills = [...document.querySelectorAll('.role-pill')];
-  const demoHelp = document.getElementById('demo-help');
+  const roleHelp = document.getElementById('role-help');
   let config = { auth_mode: 'demo' };
   let supabaseClient = null;
 
   fetch('/api/config').then(r => r.json()).then(value => {
     config = value;
     if (config.auth_mode === 'supabase' && window.supabase) {
+      document.body.classList.remove('role-login');
       supabaseClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
-      demoHelp.hidden = true;
+      roleHelp.hidden = true;
       email.value = ''; password.value = ''; 
       pills.forEach(p => p.hidden = true);
-      document.querySelector('.demo-divider').hidden = true;
-    } else if (config.auth_mode !== 'demo') {
-      demoHelp.hidden = true;
+      document.querySelector('.role-divider').hidden = true;
+    } else if (config.auth_mode === 'demo') {
+      document.body.classList.add('role-login');
+      const selected = pills.find(pill => pill.classList.contains('selected')) || pills[0];
+      if (selected) { email.value = selected.dataset.email; password.value = 'MaplePro2026!'; }
+    } else {
+      document.body.classList.remove('role-login');
+      roleHelp.hidden = true;
     }
   }).catch(() => {});
 
@@ -27,7 +33,7 @@
     email.value = pill.dataset.email;
     password.value = 'MaplePro2026!';
     errorBox.hidden = true;
-    password.focus();
+    submit.focus();
   }));
 
   document.getElementById('toggle-password').addEventListener('click', () => {

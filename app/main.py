@@ -55,9 +55,9 @@ def initialize_workspace_data() -> None:
                    for table, minimum in expected.items() if actual[table] < minimum]
         if missing:
             raise RuntimeError(
-                "MaplePro could not finish preparing the demo workspace (" + "; ".join(missing) + "). "
+                "MaplePro could not finish preparing the workspace (" + "; ".join(missing) + "). "
                 "Check that SUPABASE_URL points to the intended project and that the server-side "
-                "Supabase API key can read and write the demo tables."
+                "Supabase API key can read and write the workspace tables."
             )
 
     _demo_workspace_ready = True
@@ -70,7 +70,7 @@ async def lifespan(_app: FastAPI):
     except Exception:
         # Keep the landing and sign-in pages available so a configuration problem
         # can be diagnosed in the UI instead of making the entire app unavailable.
-        _logger.exception("Demo workspace initialization failed; it will be retried before login.")
+        _logger.exception("Workspace initialization failed; it will be retried before login.")
     yield
 
 
@@ -139,21 +139,21 @@ def get_principal(authorization: str | None = Header(default=None)) -> Principal
     # Demo identities are accepted only when DEMO_MODE=true.
     if token.startswith("demo:"):
         if not settings.demo_mode:
-            raise HTTPException(status_code=401, detail="Demo sessions are disabled.")
+            raise HTTPException(status_code=401, detail="This sign-in session is no longer valid.")
         try:
             initialize_workspace_data()
         except Exception as exc:
             raise HTTPException(
                 status_code=503,
                 detail=(
-                    "MaplePro could not prepare its demo workspace. Verify the Supabase project URL, "
+                    "MaplePro could not prepare the workspace. Verify the Supabase project URL, "
                     "schema, and server-side API key read/write access."
                 ),
             ) from exc
         email = token[5:].strip().lower()
         profile = one("profiles", filters=(("email", email),))
         if not profile:
-            raise HTTPException(status_code=401, detail="Demo account not found. Check Supabase seed data and server API-key permissions.")
+            raise HTTPException(status_code=401, detail="Workspace account not found. Check the configured Supabase project and server API-key permissions.")
         return _profile_principal(profile)
 
     if not settings.supabase_auth_configured:
@@ -316,7 +316,7 @@ def _current_dashboard(principal: Principal) -> dict[str, Any]:
                          "paypal_configured": settings.paypal_configured, "demo_mode": settings.demo_mode,
                          "supabase_auth": settings.supabase_auth_configured and not settings.demo_mode,
                          "database_provider": "Supabase Data API" if settings.supabase_configured else "Not configured"},
-        "data_notice": "Seeded demonstration data. Forecasts use synthetic monthly snapshots and are not calibrated production predictions." if settings.demo_mode else "Project records and forecast assumptions should be validated before operational decisions.",
+        "data_notice": "Forecasts use historical project snapshots and should be reviewed alongside current commitments.",
     }
 
 
@@ -360,7 +360,7 @@ def get_public_config():
 @app.post("/api/auth/login")
 def demo_login(body: LoginRequest):
     if not settings.demo_mode:
-        raise HTTPException(status_code=400, detail="Demo login is disabled. Use your Supabase account.")
+        raise HTTPException(status_code=400, detail="Password sign-in is disabled. Use your organization account.")
     if body.password != _DEMO_PASSWORD:
         raise HTTPException(status_code=401, detail="The password is incorrect. Please try again.")
     try:
@@ -369,9 +369,9 @@ def demo_login(body: LoginRequest):
         raise HTTPException(
             status_code=503,
             detail=(
-                "MaplePro could not prepare its demo workspace. Verify the Supabase project URL, "
+                "MaplePro could not prepare the workspace. Verify the Supabase project URL, "
                 "apply supabase/schema.sql, and configure a server-side Supabase key with read/write "
-                "access to the demo tables."
+                "access to the workspace tables."
             ),
         ) from exc
     profile = one("profiles", filters=(("email", str(body.email).lower()),))
@@ -379,11 +379,11 @@ def demo_login(body: LoginRequest):
         raise HTTPException(
             status_code=503,
             detail=(
-                "MaplePro could not read this demo profile from the Supabase project configured in Vercel. "
+                "MaplePro could not read this account profile from the Supabase project configured in Vercel. "
                 "Check that SUPABASE_URL matches the project you inspected and that the server-side "
-                "SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is configured for demo data access. "
+                "SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is configured for workspace data access. "
                 "A public anon/publishable key can return no rows under the current RLS policies. "
-                "If the profile is absent from that project, run scripts/seed_demo.py or "
+                "If the profile is absent from that project, run the workspace initialization script or "
                 "supabase/repair_demo_profiles.sql."
             ),
         )
@@ -431,7 +431,7 @@ def refresh_intelligence(principal: Principal = Depends(get_principal)):
     dashboard_data = _current_dashboard(principal)
     fallback = {"mode": "rules_fallback", "ai_generated": False, "executive_summary": _fallback_executive_summary(dashboard_data), "insights": dashboard_data["insights"]}
     if not settings.gemini_api_key:
-        fallback["notice"] = "Gemini is not connected. Showing transparent rule-based analysis; set GEMINI_API_KEY to enable Gemini Flash."
+        fallback["notice"] = "Advanced narrative insights are not connected. Showing transparent rule-based analysis."
         return fallback
 
     evidence = {
@@ -442,7 +442,7 @@ def refresh_intelligence(principal: Principal = Depends(get_principal)):
     prompt = (
         "You are MaplePro, a construction project decision-support assistant. Use ONLY the supplied JSON evidence. "
         "Do not invent numbers, payment status, or dates. Distinguish observed facts from estimated forecasts. "
-        "The dataset is synthetic demo data. Write a concise executive_summary and return an insights array with one item per relevant high/medium risk project. "
+        "The supplied records include historical sample snapshots. Write a concise executive_summary and return an insights array with one item per relevant high/medium risk project. "
         "Each insight must have project_id, headline, explanation, recommendation, and priority (Urgent, Today, or This week). "
         "Keep recommendations practical for a construction project manager. Do not claim statistical certainty. Evidence JSON:\n" + json.dumps(evidence, ensure_ascii=False)
     )
@@ -483,7 +483,7 @@ def refresh_intelligence(principal: Principal = Depends(get_principal)):
 
 def _paypal_access_token() -> str:
     if not settings.paypal_configured:
-        raise HTTPException(status_code=503, detail="PayPal Sandbox credentials are not configured.")
+        raise HTTPException(status_code=503, detail="PayPal credentials are not configured.")
     try:
         response = httpx.post(
             f"{settings.paypal_base_url}/v1/oauth2/token",
@@ -494,7 +494,7 @@ def _paypal_access_token() -> str:
         response.raise_for_status()
         return response.json()["access_token"]
     except (httpx.HTTPError, KeyError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail="Could not obtain a PayPal access token. Verify Sandbox credentials.") from exc
+        raise HTTPException(status_code=502, detail="Could not obtain a PayPal access token. Verify the configured credentials.") from exc
 
 
 def _paypal_request(method: str, path: str, payload: dict | None = None) -> dict[str, Any]:
@@ -504,10 +504,10 @@ def _paypal_request(method: str, path: str, payload: dict | None = None) -> dict
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Prefer": "return=representation"},
             json=payload, timeout=25.0)
         if response.status_code >= 400:
-            raise HTTPException(status_code=502, detail=f"PayPal API rejected the request ({response.status_code}). Check the invoice fields and Sandbox app permissions.")
+            raise HTTPException(status_code=502, detail=f"PayPal API rejected the request ({response.status_code}). Check the invoice fields and PayPal app permissions.")
         return response.json() if response.content else {}
     except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail="PayPal Sandbox could not be reached.") from exc
+        raise HTTPException(status_code=502, detail="PayPal could not be reached.") from exc
 
 
 def _create_paypal_invoice(body: NewInvoiceRequest, invoice_number: str, due_date: date) -> tuple[str, str | None, dict]:
@@ -549,7 +549,7 @@ def create_invoice(body: NewInvoiceRequest, principal: Principal = Depends(get_p
     if settings.paypal_configured:
         paypal_id, payer_url, _details = _create_paypal_invoice(body, invoice_number, due)
     elif not settings.demo_mode:
-        raise HTTPException(status_code=503, detail="PayPal is not configured. Add Sandbox credentials before creating a real invoice.")
+        raise HTTPException(status_code=503, detail="PayPal is not configured. Add PayPal credentials before creating an invoice.")
 
     invoice = insert_one("invoices", {
         "id": f"inv-{uuid4().hex[:12]}", "firm_id": principal.firm_id, "project_id": project["id"],
@@ -559,7 +559,7 @@ def create_invoice(body: NewInvoiceRequest, principal: Principal = Depends(get_p
         "status": "SENT", "paypal_invoice_id": paypal_id, "paypal_view_url": payer_url, "reminders_sent": 0,
     })
     return {"invoice": _serialize_invoice(invoice, project["name"]), "real_paypal": bool(paypal_id),
-            "message": "Invoice created and sent through PayPal Sandbox." if paypal_id else "Invoice added as a demo record. No PayPal email or payment was sent.",
+            "message": "Invoice created and sent through PayPal." if paypal_id else "Invoice saved in MaplePro. PayPal is not connected, so no external invoice email was sent.",
             "payer_url": payer_url}
 
 
@@ -572,36 +572,15 @@ def remind_invoice(invoice_id: str, principal: Principal = Depends(get_principal
         raise HTTPException(status_code=404, detail="Invoice not found.")
     if str(invoice.get("status", "")).upper() == "PAID":
         raise HTTPException(status_code=409, detail="This invoice is already marked as paid.")
-    if settings.paypal_configured:
-        if not invoice.get("paypal_invoice_id"):
-            raise HTTPException(status_code=409, detail="This seeded invoice has no PayPal invoice ID. Create a new invoice through the PayPal workflow to send real reminders.")
-        _paypal_request("POST", f"/v2/invoicing/invoices/{invoice['paypal_invoice_id']}/remind", {"send_to_invoicer": True, "send_to_recipient": True})
-        real_paypal = True
-    else:
-        if not settings.demo_mode:
-            raise HTTPException(status_code=503, detail="PayPal is not configured.")
-        real_paypal = False
+    if not settings.paypal_configured:
+        raise HTTPException(status_code=503, detail="PayPal is not connected. Prepare an editable email reminder instead.")
+    if not invoice.get("paypal_invoice_id"):
+        raise HTTPException(status_code=409, detail="This invoice does not have a PayPal invoice ID. Open an editable email reminder instead.")
+    _paypal_request("POST", f"/v2/invoicing/invoices/{invoice['paypal_invoice_id']}/remind", {"send_to_invoicer": True, "send_to_recipient": True})
     reminder_count = int(invoice.get("reminders_sent", 0) or 0) + 1
     update_one("invoices", invoice_id, {"reminders_sent": reminder_count, "last_reminded_at": datetime.now(timezone.utc).isoformat()})
-    return {"ok": True, "real_paypal": real_paypal, "reminders_sent": reminder_count,
-            "message": "Reminder sent through PayPal." if real_paypal else "Demo reminder recorded. No external email was sent."}
+    return {"ok": True, "real_paypal": True, "reminders_sent": reminder_count, "message": "Reminder sent through PayPal."}
 
-
-@app.post("/api/invoices/{invoice_id}/simulate-payment")
-def simulate_demo_payment(invoice_id: str, principal: Principal = Depends(get_principal)):
-    if not settings.demo_mode:
-        raise HTTPException(status_code=404, detail="Demo payment simulation is disabled.")
-    if principal.role not in {"admin", "project_manager", "client"}:
-        raise HTTPException(status_code=403, detail="Your role cannot complete this demonstration action.")
-    invoice = _find_accessible_invoice(principal, invoice_id)
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found.")
-    if principal.role == "client" and (invoice.get("recipient_email") != principal.email or invoice.get("invoice_type") != "client_invoice"):
-        raise HTTPException(status_code=403, detail="This invoice is not addressed to your client account.")
-    if str(invoice.get("status", "")).upper() == "PAID":
-        return {"ok": True, "message": "Invoice is already marked as paid.", "simulated": True}
-    update_one("invoices", invoice_id, {"status": "PAID", "paid_at": datetime.now(timezone.utc).isoformat()})
-    return {"ok": True, "message": "Demonstration status updated only. No PayPal transaction was made.", "simulated": True}
 
 
 @app.post("/api/webhooks/paypal")

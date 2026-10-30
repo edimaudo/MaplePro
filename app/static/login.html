@@ -5,7 +5,7 @@
   <title>Sign in — MaplePro</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=20261029-workspace-actions-tabs">
 </head>
 <body class="login-page">
   <div class="login-layout">
@@ -19,25 +19,25 @@
         <div class="login-heading"><h2>Sign in to your workspace</h2><p>Access project health, invoice tracking, and your team's priorities.</p></div>
         <form id="login-form" class="login-form">
           <label for="email">Email address</label>
-          <input id="email" name="email" type="email" autocomplete="username" required value="manager@maplepro.demo" placeholder="name@company.com">
+          <input id="email" name="email" type="email" autocomplete="username" required value="" placeholder="name@company.com">
           <label for="password">Password</label>
-          <div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" required value="MaplePro2026!"><button type="button" id="toggle-password" aria-label="Show password">Show</button></div>
+          <div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" required value=""><button type="button" id="toggle-password" aria-label="Show password">Show</button></div>
           <div class="login-error" id="login-error" role="alert" hidden></div>
           <button class="button button-primary button-full login-submit" id="login-submit" type="submit">Sign in <span aria-hidden="true">→</span></button>
         </form>
-        <div class="demo-divider"><span>OR TRY A DEMO ROLE</span></div>
+        <div class="role-divider"><span>SELECT A WORKSPACE ROLE</span></div>
         <div class="role-pills" id="role-pills">
           <button type="button" class="role-pill selected" data-email="manager@maplepro.demo"><span class="role-avatar role-avatar-green">OC</span><span><b>Project manager</b><small>Full project oversight</small></span></button>
           <button type="button" class="role-pill" data-email="admin@maplepro.demo"><span class="role-avatar role-avatar-dark">AM</span><span><b>Administrator</b><small>Firm-wide access</small></span></button>
           <button type="button" class="role-pill" data-email="client@maplepro.demo"><span class="role-avatar role-avatar-blue">JB</span><span><b>Client</b><small>Project & invoice visibility</small></span></button>
           <button type="button" class="role-pill" data-email="subcontractor@maplepro.demo"><span class="role-avatar role-avatar-sand">SP</span><span><b>Subcontractor</b><small>Assigned work & payment status</small></span></button>
         </div>
-        <p class="demo-help" id="demo-help" hidden></p>
+        <p class="role-help" id="role-help" hidden></p>
       </section>
       
     </main>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/static/login.js"></script>
+  <script src="/static/login.js?v=20261029-workspace-actions-tabs"></script>
 </body>
 </html>

@@ -193,8 +193,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .password-wrap button { position: absolute; right: 11px; color: #6a8871; background: none; border: 0; font-size: 10px; font-weight: 700; }
 .login-submit { margin-top: 9px; min-height: 45px; }
 .login-error { padding: 10px 12px; color: #9d3f37; background: #fff0ee; border: 1px solid #f4d5d1; font-size: 11px; border-radius: 7px; line-height: 1.5; }
-.demo-divider { display: flex; align-items: center; gap: 12px; margin: 24px 0 13px; color: #9ba49d; font-size: 8px; font-weight: 750; letter-spacing: 1px; }
-.demo-divider::before, .demo-divider::after { content: ''; height: 1px; background: #e8ece7; flex: 1; }
+.role-divider { display: flex; align-items: center; gap: 12px; margin: 24px 0 13px; color: #9ba49d; font-size: 8px; font-weight: 750; letter-spacing: 1px; }
+.role-divider::before, .role-divider::after { content: ''; height: 1px; background: #e8ece7; flex: 1; }
 .role-pills { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .role-pill { border: 1px solid #e1e7e0; background: white; border-radius: 8px; padding: 9px 10px; display: flex; gap: 8px; align-items: center; text-align: left; min-width: 0; transition: border-color .16s, background .16s; }
 .role-pill:hover, .role-pill.selected { border-color: #8cb7e5; background: #f2f7fd; }
@@ -206,9 +206,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .role-pill span:last-child { min-width: 0; }
 .role-pill b { display: block; font-size: 9px; color: #36463c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .role-pill small { display: block; color: #939c94; font-size: 8px; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.demo-help { color: #78867a; background: #edf4fc; border: 1px solid #dce9f8; padding: 10px 12px; border-radius: 7px; font-size: 9px; margin: 14px 0 0; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.demo-help code { color: #285b91; font-size: 9px; }
-.demo-help span { color: #9ca69d; }
+.role-help { color: #78867a; background: #edf4fc; border: 1px solid #dce9f8; padding: 10px 12px; border-radius: 7px; font-size: 9px; margin: 14px 0 0; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.role-help code { color: #285b91; font-size: 9px; }
+.role-help span { color: #9ca69d; }
 .login-legal { width: min(100%, 425px); margin-top: 27px; text-align: center; color: #a2aaa3; font-size: 9px; line-height: 1.5; }
 
 /* App workspace */
@@ -601,7 +601,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .stat-card { padding: 12px; }
   .stat-label { max-width: 110px; }
   .stat-icon { width: 24px; height: 24px; }
-  .stat-value { font-size: 21px; }
+  .stat-value { font-size: calc(21px * var(--font-scale, 1)); }
   .overview-grid { gap: 12px; }
   .panel-header { padding: 14px 13px 11px; }
   .intelligence-list { padding: 0 8px 9px; }
@@ -659,7 +659,7 @@ html, body, button, input, select, textarea { font-family: Inter, Arial, sans-se
 .font-size-control { display:flex; align-items:center; gap:2px; padding:2px; border:1px solid var(--app-line); border-radius:7px; background:var(--app-surface-soft); }
 .font-size-control button { border:0; background:transparent; color:var(--app-muted); border-radius:5px; min-width:25px; height:25px; font-size:calc(12px * var(--font-scale, 1)); }
 .font-size-control button.active { background:var(--app-surface); color:var(--app-ink); box-shadow:0 1px 3px #0001; }
-html { --font-scale: 1; } html[data-font-size='small'] { --font-scale: .92; } html[data-font-size='medium'] { --font-scale: 1; } html[data-font-size='large'] { --font-scale: 1.15; }
+html { --font-scale: 1; } html[data-font-size='small'] { --font-scale: .75; } html[data-font-size='medium'] { --font-scale: 1; } html[data-font-size='large'] { --font-scale: 1.25; }
 
 html[data-font-size='large'] .page-heading h1 { font-size:calc(clamp(25px,2.6vw,32px) * var(--font-scale, 1)); }
 
@@ -753,4 +753,60 @@ html[data-font-size='large'] .page-heading h1 { font-size:calc(clamp(25px,2.6vw,
   .report-panel-grid { grid-template-columns: 1fr; }
   .receivables-summary { grid-template-columns: 1fr; gap: 9px; }
   .receivables-summary .stat-card { padding: 15px; }
+}
+
+
+/* Compact workspace tabs used by the command center and intelligence views. */
+.workspace-tabs { display:flex; align-items:stretch; gap:5px; max-width:100%; overflow-x:auto; padding:5px; margin:0 0 16px; border:1px solid var(--app-line); border-radius:10px; background:var(--app-surface-soft); scrollbar-width:thin; }
+.workspace-tab { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:42px; padding:9px 14px; border:1px solid transparent; border-radius:7px; background:transparent; color:var(--app-muted); font-size:calc(13px * var(--font-scale, 1)); font-weight:650; white-space:nowrap; cursor:pointer; }
+.workspace-tab:hover { background:var(--app-surface); color:var(--app-ink); }
+.workspace-tab.active { background:var(--app-surface); color:var(--app-ink); border-color:var(--app-line); box-shadow:0 1px 3px #0000000a; }
+.workspace-tab span { display:inline-grid; place-items:center; min-width:21px; min-height:21px; padding:0 5px; border-radius:6px; background:var(--app-surface-soft); color:var(--app-muted); font-size:calc(10px * var(--font-scale, 1)); }
+.workspace-tab.active span { color:var(--app-blue, #2563a6); background:var(--app-blue-soft, #edf4fa); }
+.workspace-tab-panel { margin-bottom:16px; }
+.intelligence-tabs { margin-top:18px; }
+.task-next-step { align-self:flex-start; margin-top:4px; }
+.task-progress-status { color:var(--app-blue, #2563a6); font-size:calc(12px * var(--font-scale, 1)); font-weight:700; padding:8px 0 0; }
+
+/* Invoice register pagination and project context. */
+.invoice-pagination { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 20px; border-top:1px solid var(--app-line); color:var(--app-muted); font-size:calc(12px * var(--font-scale, 1)); }
+.invoice-pagination > div { display:flex; align-items:center; gap:10px; }
+.invoice-page-count { color:var(--app-ink); font-weight:650; white-space:nowrap; }
+.invoice-project-scope { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 20px 12px; padding:10px 12px; background:var(--app-surface-soft); border:1px solid var(--app-line); border-radius:8px; color:var(--app-muted); font-size:calc(12px * var(--font-scale, 1)); }
+.invoice-project-scope strong { color:var(--app-ink); }
+
+/* Dialog chrome stays clear of the risk label and remains visible in dark mode. */
+.app-dialog { position:relative; }
+.dialog-close-form { position:absolute; top:0; right:0; height:auto; padding:10px; z-index:5; }
+.dialog-close-form .icon-button { width:35px; height:35px; margin:0; color:var(--app-ink, #26342c); background:var(--app-surface-soft, #f7faf6); border:1px solid var(--app-line, #e7ebe6); font-size:22px; line-height:1; }
+.project-dialog { width:min(760px, calc(100vw - 28px)); max-width:760px; padding-top:12px; }
+.project-dialog .project-detail-head { display:flex; align-items:flex-start; justify-content:space-between; gap:58px; padding:22px 62px 12px 26px; min-width:0; }
+.project-dialog .project-detail-head > div:first-child { min-width:0; }
+.project-dialog .project-detail-head .risk-chip { flex:0 0 auto; margin-top:7px; }
+.project-dialog .project-detail-body { padding:8px 26px 25px; }
+.project-dialog .dialog-close-form .icon-button { margin:0; }
+[data-theme="dark"] .dialog-close-form .icon-button,
+html[data-theme="dark"] .dialog-close-form .icon-button { color:#f3f7fc; background:#263b52; border-color:#52677f; }
+
+/* Reminder composer: editable before the message is handed to the user's email client. */
+.reminder-dialog { width:min(700px, calc(100vw - 28px)); max-width:700px; }
+.reminder-dialog .dialog-header { padding-right:66px; }
+.reminder-dialog .dialog-form textarea { width:100%; min-height:230px; resize:vertical; border:1px solid var(--app-line); border-radius:8px; background:var(--app-surface); color:var(--app-ink); padding:12px; font:inherit; font-size:calc(13px * var(--font-scale, 1)); line-height:1.65; }
+.reminder-context { display:flex; flex-direction:column; gap:4px; padding:11px 12px; background:var(--app-surface-soft); border:1px solid var(--app-line); border-radius:8px; color:var(--app-muted); font-size:calc(12px * var(--font-scale, 1)); }
+.reminder-context strong { color:var(--app-ink); }
+
+/* Role selection is an alternative to showing internal account aliases on the sign-in page. */
+.role-login .login-form label[for="email"], .role-login #email,
+.role-login .login-form label[for="password"], .role-login .password-wrap { display:none !important; }
+.role-login .role-divider { margin-top:0; }
+
+@media (max-width:700px) {
+  .workspace-tabs { width:100%; gap:3px; }
+  .workspace-tab { flex:1 0 auto; padding:8px 10px; font-size:calc(12px * var(--font-scale, 1)); }
+  .invoice-pagination { align-items:flex-start; flex-direction:column; padding:12px; }
+  .invoice-pagination > div { width:100%; justify-content:space-between; }
+  .invoice-project-scope { margin:0 12px 10px; align-items:flex-start; flex-direction:column; }
+  .project-dialog .project-detail-head { padding:23px 56px 12px 17px; gap:8px; flex-direction:column; }
+  .project-dialog .project-detail-body { padding:8px 17px 20px; }
+  .project-dialog .project-detail-head .risk-chip { margin-top:4px; }
 }

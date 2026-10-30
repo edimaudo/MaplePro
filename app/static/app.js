@@ -9,7 +9,7 @@
   const projectDialog = document.getElementById('project-dialog');
   const searchInput = document.getElementById('global-search');
   const searchPopover = document.getElementById('search-popover');
-  const state = { config: {}, dashboard: null, user: null, view: 'overview', intelligence: null, searchTimer: null, projectFilter: 'all', invoiceFilter: 'all', reportTab: 'cost' };
+  const state = { config: {}, dashboard: null, user: null, view: 'overview', intelligence: null, searchTimer: null, projectFilter: 'all', invoiceFilter: 'all', invoiceProjectFilter: null, invoicePage: 1, invoicePageSize: 10, reportTab: 'cost', overviewTab: 'priority', intelligenceTab: 'urgent', actionedInsights: new Set() };
 
   const money = value => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(Number(value || 0));
   const money2 = value => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
@@ -51,7 +51,7 @@
   function setFontSize(size) {
     const allowed = ['small', 'medium', 'large'];
     const selected = allowed.includes(size) ? size : 'medium';
-    const scale = { small: 0.92, medium: 1, large: 1.15 }[selected];
+    const scale = { small: 0.75, medium: 1, large: 1.25 }[selected];
     document.documentElement.dataset.fontSize = selected;
     document.documentElement.style.setProperty('--font-scale', String(scale));
     localStorage.setItem('maplepro_font_size', selected);
@@ -68,6 +68,26 @@
     document.getElementById('nav-risk-count').textContent = state.dashboard?.stats.high_risk_projects ?? '—';
     document.getElementById('nav-invoice-dot').hidden = !(state.dashboard?.stats.overdue_invoice_count > 0);
     document.querySelectorAll('.nav-item[data-view="team"]').forEach(el => { el.hidden = user.role !== 'admin'; });
+    if (state.actionedInsights.size === 0) loadActionedInsights();
+  }
+
+  function actionedInsightsStorageKey() {
+    return `maplepro_next_steps_${state.user?.id || 'workspace'}`;
+  }
+
+  function loadActionedInsights() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(actionedInsightsStorageKey()) || '[]');
+      state.actionedInsights = new Set(Array.isArray(saved) ? saved : []);
+    } catch (_) {
+      state.actionedInsights = new Set();
+    }
+  }
+
+  function moveInsightToNextSteps(insightId) {
+    if (!insightId) return;
+    state.actionedInsights.add(insightId);
+    localStorage.setItem(actionedInsightsStorageKey(), JSON.stringify([...state.actionedInsights]));
   }
 
   function pageHeader(kicker, title, subtitle, actions = '') {
@@ -96,7 +116,7 @@
     const action = insight.recommendation || insight.recommended_action || 'Review project signals';
     const source = insight.ai_generated ? 'Insight' : 'Signal';
     const confidence = insight.confidence_score ? `<div class="confidence-note"><strong>${escapeHtml(insight.confidence_score)}% signal confidence</strong> · based on data completeness, not a failure probability</div>` : '';
-    const button = insight.invoice_id ? `<button class="insight-action" data-action="remind" data-id="${escapeHtml(insight.invoice_id)}"><span>${escapeHtml(action)}</span><span>→</span></button>` : `<button class="insight-action" data-action="view-project" data-id="${escapeHtml(insight.project_id || '')}"><span>${escapeHtml(action)}</span><span>→</span></button>`;
+    const button = insight.invoice_id ? `<button class="insight-action" data-action="remind" data-id="${escapeHtml(insight.invoice_id)}" data-insight-id="${escapeHtml(insight.id || '')}"><span>Prepare reminder</span><span>→</span></button>` : `<button class="insight-action" data-action="view-project" data-id="${escapeHtml(insight.project_id || '')}" data-insight-id="${escapeHtml(insight.id || '')}"><span>${escapeHtml(action)}</span><span>→</span></button>`;
     return `<article class="insight-card${compact ? ' compact' : ''}"><div class="insight-marker ${markerClass}">${markerClass === 'urgent' ? '!' : markerClass === 'medium' ? '↗' : '✓'}</div><div class="insight-body"><div class="insight-topline"><h3>${escapeHtml(headline)}</h3><span class="priority-label ${priorityClass}">${escapeHtml(priority)}</span></div><p class="insight-project">${escapeHtml(projectName)} · ${escapeHtml(source)}</p><p class="insight-explanation">${escapeHtml(description)}</p>${button}${confidence}</div></article>`;
   }
 
@@ -144,10 +164,9 @@
     return `<div class="table-wrap"><table class="data-table"><thead><tr><th>Invoice</th>${showProject ? '<th>Project</th>' : ''}<th>Bill to</th><th>Due date</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>${invoices.map(i => {
       let action = '';
       if (state.user.role === 'admin' || state.user.role === 'project_manager') {
-        if (i.status !== 'PAID') action += `<button class="table-action warn" data-action="remind" data-id="${escapeHtml(i.id)}">Remind</button>`;
+        if (i.status !== 'PAID') action += `<button class="table-action warn" data-action="remind" data-id="${escapeHtml(i.id)}">Prepare reminder</button>`;
         if (i.paypal_view_url) action += ` <button class="table-action" data-action="open-invoice" data-url="${escapeHtml(i.paypal_view_url)}">Open</button>`;
       }
-      if (state.config.demo_mode && i.status !== 'PAID' && ['admin','project_manager','client'].includes(state.user.role)) action += ` <button class="table-action" data-action="simulate-payment" data-id="${escapeHtml(i.id)}">Simulate</button>`;
       if (i.status === 'PAID') action = `<span class="table-secondary">${i.paid_at ? `Paid ${shortDate(i.paid_at.slice(0,10))}` : 'Settled'}</span>`;
       if (!action) action = '<span class="table-secondary">View only</span>';
       return `<tr data-invoice-row="${escapeHtml(i.id)}"><td><span class="table-primary">${escapeHtml(i.invoice_number)}</span><span class="table-secondary">${escapeHtml(i.description)}</span></td>${showProject ? `<td><span class="table-primary">${escapeHtml(i.project_name)}</span></td>` : ''}<td><span class="table-primary">${escapeHtml(i.recipient_name)}</span><span class="table-secondary">${escapeHtml(i.recipient_email)}</span></td><td><span class="table-primary">${shortDate(i.due_date)}</span><span class="table-secondary">${i.status !== 'PAID' && i.overdue_days ? `${i.overdue_days} days overdue` : `Issued ${shortDate(i.issued_date)}`}</span></td><td><span class="table-primary">${money2(i.amount)}</span><span class="table-secondary">${escapeHtml(i.currency_code)}</span></td><td>${statusPill(i.status)}</td><td><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">${action}</div></td></tr>`;
@@ -157,16 +176,29 @@
   function renderOverview() {
     const d = state.dashboard;
     const insights = state.intelligence?.insights || d.insights;
-    return `${pageHeader(new Date().toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase(), `Good morning, ${state.user.name.split(' ')[0]}`, 'Here is what needs your attention across the projects you can access.', `<button class="button button-quiet" data-action="refresh-dashboard">↻ Refresh</button>${['admin','project_manager'].includes(state.user.role) ? '<button class="button button-primary" data-action="new-invoice">＋ New invoice</button>' : ''}`)}
-      ${renderStats(d.stats)}
-      <div class="overview-grid"><div>
-        <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Priority intelligence</h2><p class="panel-subtitle">Signals ranked by urgency and business impact</p></div><button class="panel-link" data-view="intelligence">See all insights →</button></div><div class="intelligence-list">${insights.length ? insights.slice(0,4).map(i => insightCardHTML(i, true)).join('') : '<div class="empty-state"><strong>No priority signals</strong>There are no elevated signals in your current view.</div>'}</div></section>
-        <section class="panel portfolio-panel"><div class="panel-header"><div><h2 class="panel-title">Project health</h2><p class="panel-subtitle">Recorded progress and rule-based risk index</p></div><button class="panel-link" data-view="projects">All projects →</button></div>${renderPortfolio(d.projects, true)}</section>
-      </div><div class="right-column">
-        <section class="cash-card"><div class="panel-header"><div><h2 class="panel-title">Cash collected</h2><p class="panel-subtitle">Paid invoice records by issue month</p></div><button class="panel-link" data-view="invoices">Invoices →</button></div><div class="cash-value">${money(d.invoices.filter(i => i.status === 'PAID').reduce((sum,i) => sum + Number(i.amount),0))}</div><div class="cash-caption">From invoices in your current view</div>${renderCashBars(d.invoices)}<div class="cash-legend"><span><i></i> Recorded paid invoices</span><span>CAD</span></div></section>
-        <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Upcoming milestones</h2><p class="panel-subtitle">Next scheduled project checkpoints</p></div><button class="panel-link" data-view="projects">View projects →</button></div>${renderMilestones(d.milestones)}</section>
-      </div></div>
-      <section class="panel" style="margin-top:17px"><div class="panel-header"><div><h2 class="panel-title">Recent invoices</h2><p class="panel-subtitle">Keep payment activity visible alongside delivery risk.</p></div><button class="panel-link" data-view="invoices">Manage invoices →</button></div>${renderInvoiceTable([...d.invoices].sort((a,b) => (b.overdue_days || 0) - (a.overdue_days || 0)).slice(0,5), {showProject:true})}</section>`;
+    const recentInvoices = [...d.invoices].sort((a,b) => (b.overdue_days || 0) - (a.overdue_days || 0)).slice(0, 8);
+    const tabs = [
+      ['priority', 'Priority', insights.length],
+      ['projects', 'Projects', d.projects.length],
+      ['cash', 'Cash flow', d.invoices.filter(i => i.status === 'PAID').length],
+      ['milestones', 'Milestones', d.milestones.length],
+      ['invoices', 'Recent invoices', recentInvoices.length],
+    ];
+    const selected = tabs.some(([id]) => id === state.overviewTab) ? state.overviewTab : 'priority';
+    const tabMarkup = tabs.map(([id, label, count]) => `<button type="button" class="workspace-tab${selected === id ? ' active' : ''}" role="tab" id="overview-tab-${id}" aria-selected="${selected === id}" aria-controls="overview-panel-${id}" tabindex="${selected === id ? 0 : -1}" data-overview-tab="${id}">${label}<span>${count}</span></button>`).join('');
+    let panel = '';
+    if (selected === 'priority') {
+      panel = `<section class="panel workspace-tab-panel" role="tabpanel" id="overview-panel-priority" aria-labelledby="overview-tab-priority"><div class="panel-header"><div><h2 class="panel-title">Priority intelligence</h2><p class="panel-subtitle">Signals ranked by urgency and business impact.</p></div><button class="panel-link" data-view="intelligence">See all insights →</button></div><div class="intelligence-list">${insights.length ? insights.slice(0, 4).map(i => insightCardHTML(i, true)).join('') : '<div class="empty-state"><strong>No priority signals</strong>There are no elevated signals in your current view.</div>'}</div></section>`;
+    } else if (selected === 'projects') {
+      panel = `<section class="panel workspace-tab-panel" role="tabpanel" id="overview-panel-projects" aria-labelledby="overview-tab-projects"><div class="panel-header"><div><h2 class="panel-title">Project health</h2><p class="panel-subtitle">Recorded progress and risk across your portfolio.</p></div><button class="panel-link" data-view="projects">All projects →</button></div>${renderPortfolio(d.projects, false)}</section>`;
+    } else if (selected === 'cash') {
+      panel = `<section class="cash-card workspace-tab-panel" role="tabpanel" id="overview-panel-cash" aria-labelledby="overview-tab-cash"><div class="panel-header"><div><h2 class="panel-title">Cash collected</h2><p class="panel-subtitle">Paid invoice records by issue month.</p></div><button class="panel-link" data-view="invoices">Invoices →</button></div><div class="cash-value">${money(d.invoices.filter(i => i.status === 'PAID').reduce((sum,i) => sum + Number(i.amount),0))}</div><div class="cash-caption">From invoices in your current view.</div>${renderCashBars(d.invoices)}<div class="cash-legend"><span><i></i> Recorded paid invoices</span><span>CAD</span></div></section>`;
+    } else if (selected === 'milestones') {
+      panel = `<section class="panel workspace-tab-panel" role="tabpanel" id="overview-panel-milestones" aria-labelledby="overview-tab-milestones"><div class="panel-header"><div><h2 class="panel-title">Upcoming milestones</h2><p class="panel-subtitle">Next scheduled project checkpoints.</p></div><button class="panel-link" data-view="projects">View projects →</button></div>${renderMilestones(d.milestones)}</section>`;
+    } else {
+      panel = `<section class="panel workspace-tab-panel" role="tabpanel" id="overview-panel-invoices" aria-labelledby="overview-tab-invoices"><div class="panel-header"><div><h2 class="panel-title">Recent invoices</h2><p class="panel-subtitle">Recent billing and payment activity.</p></div><button class="panel-link" data-view="invoices">Manage invoices →</button></div>${renderInvoiceTable(recentInvoices, {showProject:true})}</section>`;
+    }
+    return `${pageHeader(new Date().toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase(), `Good morning, ${state.user.name.split(' ')[0]}`, 'Here is what needs your attention across the projects you can access.', `<button class="button button-quiet" data-action="refresh-dashboard">↻ Refresh</button>${['admin','project_manager'].includes(state.user.role) ? '<button class="button button-primary" data-action="new-invoice">＋ New invoice</button>' : ''}`)}${renderStats(d.stats)}<div class="workspace-tabs" role="tablist" aria-label="Command center sections">${tabMarkup}</div>${panel}`;
   }
 
   function renderProjects() {
@@ -181,24 +213,49 @@
     const d = state.dashboard;
     const roleCanCreate = ['admin','project_manager'].includes(state.user.role);
     let invoices = [...d.invoices];
+    if (state.invoiceProjectFilter) invoices = invoices.filter(i => i.project_id === state.invoiceProjectFilter);
     if (state.invoiceFilter === 'unpaid') invoices = invoices.filter(i => i.status !== 'PAID');
     if (state.invoiceFilter === 'overdue') invoices = invoices.filter(i => i.status !== 'PAID' && i.overdue_days > 0);
     if (state.invoiceFilter === 'paid') invoices = invoices.filter(i => i.status === 'PAID');
+    invoices.sort((a,b) => (b.overdue_days || 0) - (a.overdue_days || 0) || String(a.due_date || '').localeCompare(String(b.due_date || '')));
+    const pageCount = Math.max(1, Math.ceil(invoices.length / state.invoicePageSize));
+    state.invoicePage = Math.min(Math.max(1, state.invoicePage), pageCount);
+    const startIndex = (state.invoicePage - 1) * state.invoicePageSize;
+    const pageInvoices = invoices.slice(startIndex, startIndex + state.invoicePageSize);
     const filter = `<select class="filter-select" id="invoice-status-filter" aria-label="Filter invoices"><option value="all" ${state.invoiceFilter==='all'?'selected':''}>All invoices</option><option value="overdue" ${state.invoiceFilter==='overdue'?'selected':''}>Overdue</option><option value="unpaid" ${state.invoiceFilter==='unpaid'?'selected':''}>Outstanding</option><option value="paid" ${state.invoiceFilter==='paid'?'selected':''}>Paid</option></select>`;
+    const project = state.invoiceProjectFilter ? projectById(state.invoiceProjectFilter) : null;
+    const projectScope = project ? `<div class="invoice-project-scope"><span>Showing invoices for <strong>${escapeHtml(project.name)}</strong></span><button class="table-action" data-action="clear-invoice-project">Clear project filter</button></div>` : '';
+    const pagination = `<div class="invoice-pagination" aria-label="Invoice register pages"><span>Showing ${invoices.length ? startIndex + 1 : 0}–${Math.min(startIndex + pageInvoices.length, invoices.length)} of ${invoices.length}</span><div><button type="button" class="button button-outline button-sm" data-invoice-page="${state.invoicePage - 1}" ${state.invoicePage <= 1 ? 'disabled' : ''}>Previous</button><span class="invoice-page-count">Page ${state.invoicePage} of ${pageCount}</span><button type="button" class="button button-outline button-sm" data-invoice-page="${state.invoicePage + 1}" ${state.invoicePage >= pageCount ? 'disabled' : ''}>Next</button></div></div>`;
     const totalOutstanding = d.invoices.filter(i=>i.status!=='PAID' && i.invoice_type==='client_invoice').reduce((sum,i)=>sum+Number(i.amount),0);
     return `${pageHeader('CASH FLOW', 'Invoices & payments', 'Create invoices, follow up on outstanding balances, and reconcile payment status.', `${roleCanCreate ? '<button class="button button-primary" data-action="new-invoice">＋ Create invoice</button>' : ''}`)}
-      <div class="stats-grid"><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Outstanding amount</span><span class="stat-icon">$</span></div><div class="stat-value">${money(totalOutstanding)}</div><div class="stat-bottom">Unpaid client invoice records</div></article><article class="stat-card stat-danger"><div class="stat-card-top"><span class="stat-label">Overdue amount</span><span class="stat-icon">!</span></div><div class="stat-value">${money(d.stats.overdue_invoice_value)}</div><div class="stat-bottom">${d.stats.overdue_invoice_count} invoices past due</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Paid invoice records</span><span class="stat-icon">✓</span></div><div class="stat-value">${d.invoices.filter(i=>i.status==='PAID').length}</div><div class="stat-bottom">Payment state from local records</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">PayPal integration</span><span class="stat-icon">↗</span></div><div class="stat-value" style="font-size:calc(19px * var(--font-scale, 1))">${state.config.paypal_configured?'Connected':'Not connected'}</div><div class="stat-bottom">${state.config.paypal_configured?'PayPal API credentials found':'Configure PayPal credentials to send actual invoices'}</div></article></div>
-      <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Invoice register</h2><p class="panel-subtitle">${d.invoices.length} invoice records visible to your role</p></div>${filter}</div>${renderInvoiceTable(invoices)}<div class="list-toolbar"><p>${state.config.demo_mode ? 'Demo actions are clearly marked and do not contact a customer.' : 'Payment changes are driven by verified provider events.'}</p></div></section>`;
+      <div class="stats-grid"><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Outstanding amount</span><span class="stat-icon">$</span></div><div class="stat-value">${money(totalOutstanding)}</div><div class="stat-bottom">Unpaid client invoice records</div></article><article class="stat-card stat-danger"><div class="stat-card-top"><span class="stat-label">Overdue amount</span><span class="stat-icon">!</span></div><div class="stat-value">${money(d.stats.overdue_invoice_value)}</div><div class="stat-bottom">${d.stats.overdue_invoice_count} invoices past due</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Paid invoice records</span><span class="stat-icon">✓</span></div><div class="stat-value">${d.invoices.filter(i=>i.status==='PAID').length}</div><div class="stat-bottom">Payment state from provider and recorded events</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">PayPal integration</span><span class="stat-icon">↗</span></div><div class="stat-value" style="font-size:calc(19px * var(--font-scale, 1))">${state.config.paypal_configured?'Connected':'Not connected'}</div><div class="stat-bottom">${state.config.paypal_configured?'PayPal credentials are available':'Connect PayPal to send invoices and collect payments'}</div></article></div>
+      <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Invoice register</h2><p class="panel-subtitle">${invoices.length} invoice records visible to your role</p></div>${filter}</div>${projectScope}${renderInvoiceTable(pageInvoices)}${pagination}</section>`;
   }
 
   function renderIntelligence() {
     const d = state.dashboard;
     const intel = state.intelligence || { mode:'rules_fallback', ai_generated:false, executive_summary: 'Project signals are ranked by urgency, cost exposure, schedule movement, and receivables.', insights:d.insights, notice: '' };
-    const action = `<button class="button button-primary" data-action="refresh-ai">Refresh insights</button>`;
-    return `${pageHeader('DECISION SUPPORT', 'MaplePro Intelligence', 'Project insights, emerging risks, and recommended actions.', action)}
+    const insights = intel.insights || [];
+    const taskKey = insight => insight.project_id || insight.id;
+    const openTasks = insights.filter(i => !state.actionedInsights.has(taskKey(i)));
+    const nextTasks = insights.filter(i => state.actionedInsights.has(taskKey(i)));
+    const groups = {
+      urgent: openTasks.filter(i => String(i.priority || '').toLowerCase().includes('urgent')),
+      today: openTasks.filter(i => String(i.priority || '').toLowerCase().includes('today')),
+      week: openTasks.filter(i => !String(i.priority || '').toLowerCase().includes('urgent') && !String(i.priority || '').toLowerCase().includes('today')),
+      next: nextTasks,
+    };
+    const tab = Object.hasOwn(groups, state.intelligenceTab) ? state.intelligenceTab : 'urgent';
+    const tabs = [['urgent','Urgent'],['today','Today'],['week','This week'],['next','Next steps']];
+    const tabMarkup = tabs.map(([id,label]) => `<button type="button" class="workspace-tab${tab === id ? ' active' : ''}" role="tab" id="intelligence-tab-${id}" aria-selected="${tab === id}" aria-controls="intelligence-panel-${id}" tabindex="${tab === id ? 0 : -1}" data-intelligence-tab="${id}">${label}<span>${groups[id].length}</span></button>`).join('');
+    const taskCards = groups[tab].map(i => {
+      const key = taskKey(i);
+      const actioned = state.actionedInsights.has(key);
+      return `<article class="intelligence-feature-card" data-insight-card data-insight-id="${escapeHtml(key)}">${insightCardHTML(i)}<div class="recommendation-block"><b>${actioned ? 'NEXT STEP' : 'RECOMMENDED NEXT STEP'}</b>${escapeHtml(i.recommendation || i.recommended_action || i.action_detail || 'Review the project details and confirm the next action.')}</div>${actioned ? '<div class="task-progress-status">Moved to next steps</div>' : `<button type="button" class="button button-outline task-next-step" data-action="move-next-step" data-id="${escapeHtml(key)}">Move to next steps</button>`}</article>`;
+    }).join('');
+    return `${pageHeader('DECISION SUPPORT', 'MaplePro Intelligence', 'Project insights, emerging risks, and recommended actions.', '<button class="button button-primary" data-action="refresh-ai">Refresh insights</button>')}
       <section class="intelligence-hero"><div><h2>${intel.ai_generated ? 'The current picture, explained.' : 'Insights from project evidence'}</h2><p>${escapeHtml(intel.executive_summary || 'Review the strongest project signals below.')}</p></div></section>
-      <div class="intelligence-grid">${(intel.insights || []).length ? intel.insights.map(i => `<article class="intelligence-feature-card">${insightCardHTML(i)}<div class="recommendation-block"><b>RECOMMENDED NEXT STEP</b>${escapeHtml(i.recommendation || i.recommended_action || i.action_detail || 'Review the project details and confirm the next action.')}</div></article>`).join('') : '<section class="panel"><div class="empty-state"><strong>No elevated signals detected</strong>Rule-based indicators did not cross the configured thresholds for your current view.</div></section>'}</div>
-      `;
+      <div class="workspace-tabs intelligence-tabs" role="tablist" aria-label="Intelligence task priorities">${tabMarkup}</div><div role="tabpanel" id="intelligence-panel-${tab}" aria-labelledby="intelligence-tab-${tab}" class="intelligence-grid">${taskCards || `<section class="panel"><div class="empty-state"><strong>${tab === 'next' ? 'No next steps yet' : 'No tasks in this priority'}</strong>${tab === 'next' ? 'Move an insight into next steps to keep track of follow-up work.' : 'There are no outstanding tasks in this category.'}</div></section>`}</div>`;
   }
 
   function renderReports() {
@@ -225,9 +282,9 @@
   function renderTeam() {
     if (state.user.role !== 'admin') return `${pageHeader('ACCESS CONTROL', 'People & access', 'Your current role has project-level access only.', '')}<section class="panel"><div class="empty-state"><strong>Administrator access required</strong>Ask a firm administrator to manage workspace membership.</div></section>`;
     const users = [
-      ['Alex Morgan','admin@maplepro.demo','Administrator','AM','role-avatar-dark'],['Olivia Chen','manager@maplepro.demo','Project Manager','OC','role-avatar-green'],['Jordan Blake','client@maplepro.demo','Client','JB','role-avatar-blue'],['Sam Patel','subcontractor@maplepro.demo','Subcontractor','SP','role-avatar-sand']
+      ['Alex Morgan','Administrator','AM','role-avatar-dark'],['Olivia Chen','Project Manager','OC','role-avatar-green'],['Jordan Blake','Client','JB','role-avatar-blue'],['Sam Patel','Subcontractor','SP','role-avatar-sand']
     ];
-    return `${pageHeader('ACCESS CONTROL', 'People & access', 'Four demo personas cover firm administration, delivery, client transparency, and trade payment visibility.', '')}<div class="data-banner" style="margin-bottom:15px"><span>ⓘ</span><span>Demo identities exist for evaluation. In a connected Supabase environment, create Auth users and map each auth user ID to an authorized firm profile before sign-in.</span></div><div class="team-grid">${users.map(u=>`<article class="team-card"><span class="role-avatar ${u[4]}">${u[3]}</span><h3>${escapeHtml(u[0])}</h3><p>${escapeHtml(u[1])}</p><span class="status-pill complete">${escapeHtml(u[2])}</span></article>`).join('')}</div><section class="panel" style="margin-top:16px"><div class="panel-header"><div><h2 class="panel-title">Authorization model</h2><p class="panel-subtitle">UI controls supplement API-side checks and firm-scoped data access.</p></div></div><div class="settings-list"><div class="settings-row"><div><strong>Administrator</strong><p>Firm-wide projects, invoices, analytics, and role visibility.</p></div><span class="settings-value">Full firm scope</span></div><div class="settings-row"><div><strong>Project manager</strong><p>Project oversight and invoice workflow for the firm.</p></div><span class="settings-value">Operational scope</span></div><div class="settings-row"><div><strong>Client</strong><p>Projects and client invoices addressed to that account.</p></div><span class="settings-value">Client email scope</span></div><div class="settings-row"><div><strong>Subcontractor</strong><p>Assigned projects and its own subcontractor invoice records.</p></div><span class="settings-value">Assignment scope</span></div></div></section>`;
+    return `${pageHeader('ACCESS CONTROL', 'People & access', 'Manage the people and roles in your construction workspace.', '')}<div class="team-grid">${users.map(u=>`<article class="team-card"><span class="role-avatar ${u[3]}">${u[2]}</span><h3>${escapeHtml(u[0])}</h3><span class="status-pill complete">${escapeHtml(u[1])}</span></article>`).join('')}</div><section class="panel" style="margin-top:16px"><div class="panel-header"><div><h2 class="panel-title">Authorization model</h2><p class="panel-subtitle">UI controls supplement API-side checks and firm-scoped data access.</p></div></div><div class="settings-list"><div class="settings-row"><div><strong>Administrator</strong><p>Firm-wide projects, invoices, analytics, and role visibility.</p></div><span class="settings-value">Full firm scope</span></div><div class="settings-row"><div><strong>Project manager</strong><p>Project oversight and invoice workflow for the firm.</p></div><span class="settings-value">Operational scope</span></div><div class="settings-row"><div><strong>Client</strong><p>Projects and client invoices addressed to that account.</p></div><span class="settings-value">Client email scope</span></div><div class="settings-row"><div><strong>Subcontractor</strong><p>Assigned projects and its own subcontractor invoice records.</p></div><span class="settings-value">Assignment scope</span></div></div></section>`;
   }
 
   function renderSettings() {
@@ -293,13 +350,37 @@
     const p = projectById(projectId);
     if (!p) { showToast('Project unavailable', 'The selected project is outside your current access scope.', true); return; }
     const relatedInvoices = state.dashboard.invoices.filter(i => i.project_id === projectId);
-    const upcomingMilestones = state.dashboard.milestones.filter(m => m.project_id === projectId);
     const reasons = [];
     if (p.overdue_invoice_count) reasons.push(`${p.overdue_invoice_count} client invoice(s) overdue.`);
     if (p.projected_variance_pct > 2) reasons.push(`Projected final cost is ${p.projected_variance_pct.toFixed(1)}% above budget.`);
     if (p.schedule_slip_days > 0) reasons.push(`Current progress trend estimates completion ${p.schedule_slip_days} days after target.`);
-    projectDialog.innerHTML = `<form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close dialog">×</button></form><div class="project-detail-head"><div><div class="page-kicker">${escapeHtml(p.code)} · ${escapeHtml(p.stage)}</div><h2>${escapeHtml(p.name)}</h2><p>${escapeHtml(p.client_name)} · ${escapeHtml(p.location)}</p></div>${riskChip(p.risk_level)}</div><div class="project-detail-body"><div class="detail-metrics"><div class="detail-metric"><small>Budget</small><strong>${money(p.budget)}</strong></div><div class="detail-metric"><small>Actual cost</small><strong>${money(p.actual_cost)}</strong></div><div class="detail-metric"><small>Forecast final cost</small><strong>${money(p.projected_final_cost)}</strong></div></div><div class="detail-progress-labels"><span>Recorded progress</span><strong>${pct(p.progress_pct)}</strong></div><div class="detail-progress"><span style="width:${Math.min(100,p.progress_pct)}%"></span></div><div class="detail-progress-labels"><span>Target: ${fullDate(p.target_completion)}</span><span>Forecast: ${fullDate(p.predicted_finish)}</span></div><h3 class="detail-section-title">Why this project is flagged</h3>${reasons.length ? reasons.map(r=>`<div class="detail-reason">${escapeHtml(r)}</div>`).join('') : '<div class="detail-reason">No elevated signal from the current rule thresholds.</div>'}<h3 class="detail-section-title">Invoices in your view</h3>${relatedInvoices.length ? relatedInvoices.map(i=>`<div class="detail-reason"><strong>${escapeHtml(i.invoice_number)} · ${money(i.amount)}</strong><br>${escapeHtml(i.description)} · ${escapeHtml(cap(i.status))} · due ${fullDate(i.due_date)}</div>`).join('') : '<div class="detail-reason">No invoices visible for this project and role.</div>'}<h3 class="detail-section-title">Current forecast assumptions</h3><div class="detail-reason">Signal confidence: <strong>${p.confidence_score}%</strong>. This reflects sample count and completeness, not a calibrated probability of risk. Forecasts use the available project history.</div><div class="dialog-actions"><button type="button" class="button button-outline" data-action="close-project">Close</button>${relatedInvoices.some(i=>i.status!=='PAID') ? `<button type="button" class="button button-primary" data-action="go-invoices">View invoices →</button>`:''}</div></div>`;
+    projectDialog.innerHTML = `<form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close dialog">×</button></form><div class="project-detail-head"><div><div class="page-kicker">${escapeHtml(p.code)} · ${escapeHtml(p.stage)}</div><h2>${escapeHtml(p.name)}</h2><p>${escapeHtml(p.client_name)} · ${escapeHtml(p.location)}</p></div>${riskChip(p.risk_level)}</div><div class="project-detail-body"><div class="detail-metrics"><div class="detail-metric"><small>Budget</small><strong>${money(p.budget)}</strong></div><div class="detail-metric"><small>Actual cost</small><strong>${money(p.actual_cost)}</strong></div><div class="detail-metric"><small>Forecast final cost</small><strong>${money(p.projected_final_cost)}</strong></div></div><div class="detail-progress-labels"><span>Recorded progress</span><strong>${pct(p.progress_pct)}</strong></div><div class="detail-progress"><span style="width:${Math.min(100,p.progress_pct)}%"></span></div><div class="detail-progress-labels"><span>Target: ${fullDate(p.target_completion)}</span><span>Forecast: ${fullDate(p.predicted_finish)}</span></div><h3 class="detail-section-title">Why this project is flagged</h3>${reasons.length ? reasons.map(r=>`<div class="detail-reason">${escapeHtml(r)}</div>`).join('') : '<div class="detail-reason">No elevated signal from the current rule thresholds.</div>'}<h3 class="detail-section-title">Invoices in your view</h3>${relatedInvoices.length ? relatedInvoices.map(i=>`<div class="detail-reason"><strong>${escapeHtml(i.invoice_number)} · ${money(i.amount)}</strong><br>${escapeHtml(i.description)} · ${escapeHtml(cap(i.status))} · due ${fullDate(i.due_date)}</div>`).join('') : '<div class="detail-reason">No invoices visible for this project and role.</div>'}<h3 class="detail-section-title">Current forecast assumptions</h3><div class="detail-reason">Signal confidence: <strong>${p.confidence_score}%</strong>. This reflects sample count and completeness, not a calibrated probability of risk. Forecasts use the available project history.</div><div class="dialog-actions"><button type="button" class="button button-outline" data-action="close-project">Close</button>${relatedInvoices.some(i=>i.status!=='PAID') ? `<button type="button" class="button button-primary" data-action="go-invoices" data-id="${escapeHtml(projectId)}">View invoices →</button>`:''}</div></div>`;
     projectDialog.showModal();
+  }
+
+  function openReminderDialog(invoiceId) {
+    const invoice = state.dashboard.invoices.find(item => item.id === invoiceId);
+    if (!invoice) { showToast('Invoice unavailable', 'This invoice is outside your current access scope.', true); return; }
+    const paymentLine = invoice.paypal_view_url
+      ? `You can review the invoice and arrange payment here:\n${invoice.paypal_view_url}`
+      : 'Please reply to this email if you need another copy of the invoice or would like to confirm payment arrangements.';
+    const body = `Hello ${invoice.recipient_name},\n\nThis is a friendly reminder that invoice ${invoice.invoice_number} for ${money2(invoice.amount)} is outstanding. The due date was ${fullDate(invoice.due_date)}.\n\n${paymentLine}\n\nPlease let us know if payment has already been arranged or if you have any questions.\n\nRegards,\n${state.user.name}\nNorthline Group`;
+    document.getElementById('reminder-dialog').innerHTML = `<form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close dialog">×</button></form><div class="dialog-header"><h2>Prepare invoice reminder</h2><p>Review and edit the message before opening it in your email application.</p></div><form id="reminder-form" class="dialog-form"><label for="reminder-to">To</label><input id="reminder-to" type="email" required value="${escapeHtml(invoice.recipient_email)}"><label for="reminder-subject">Subject</label><input id="reminder-subject" required maxlength="200" value="${escapeHtml(`Reminder: Invoice ${invoice.invoice_number} is outstanding`)}"><label for="reminder-message">Message</label><textarea id="reminder-message" required rows="10">${escapeHtml(body)}</textarea><div class="reminder-context"><strong>${escapeHtml(invoice.invoice_number)} · ${money2(invoice.amount)}</strong><span>${escapeHtml(invoice.project_name)} · Due ${fullDate(invoice.due_date)}</span></div><div class="dialog-actions"><button type="button" class="button button-outline" id="cancel-reminder">Cancel</button><button class="button button-primary" type="submit">Open email draft <span>→</span></button></div></form>`;
+    document.getElementById('cancel-reminder').addEventListener('click', () => document.getElementById('reminder-dialog').close());
+    document.getElementById('reminder-form').addEventListener('submit', handleReminderSubmit);
+    document.getElementById('reminder-dialog').showModal();
+  }
+
+  function handleReminderSubmit(event) {
+    event.preventDefault();
+    const to = document.getElementById('reminder-to').value.trim();
+    const subject = document.getElementById('reminder-subject').value.trim();
+    const message = document.getElementById('reminder-message').value;
+    if (!to || !subject || !message.trim()) return;
+    const mailto = `mailto:${encodeURIComponent(to).replace(/%40/gi, '@')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+    document.getElementById('reminder-dialog').close();
+    window.location.href = mailto;
+    showToast('Email draft opened', 'Review the message in your email application and send it when ready.');
   }
 
   async function refreshAI() {
@@ -320,33 +401,16 @@
     if (action === 'refresh-ai') { await refreshAI(); return; }
     if (action === 'view-project') { openProjectDialog(id); return; }
     if (action === 'close-project') { projectDialog.close(); return; }
-    if (action === 'go-invoices') { projectDialog.close(); navigate('invoices'); return; }
+    if (action === 'go-invoices') { projectDialog.close(); state.invoiceProjectFilter = id || null; state.invoiceFilter = 'all'; state.invoicePage = 1; navigate('invoices'); return; }
+    if (action === 'clear-invoice-project') { state.invoiceProjectFilter = null; state.invoicePage = 1; renderView(); return; }
+    if (action === 'move-next-step') { moveInsightToNextSteps(id); renderView(); showToast('Moved to next steps', 'This task is now listed in the Next steps tab.'); return; }
     if (action === 'open-invoice') {
       const url = element?.dataset.url;
       if (!url) return;
       if (!url.startsWith('https://')) { showToast('Invoice link blocked', 'Only HTTPS PayPal invoice links may be opened.', true); return; }
       window.open(url, '_blank', 'noopener,noreferrer'); return;
     }
-    if (action === 'remind') {
-      const button = element;
-      if (button) { button.disabled = true; button.textContent = 'Sending…'; }
-      try {
-        const result = await api(`/api/invoices/${encodeURIComponent(id)}/remind`, { method: 'POST' });
-        await reloadDashboard(false);
-        showToast(result.real_paypal ? 'PayPal reminder sent' : 'Demo reminder recorded', result.message);
-      } catch (err) { if (button) { button.disabled = false; button.textContent = 'Remind'; } showToast('Reminder failed', err.message, true); }
-      return;
-    }
-    if (action === 'simulate-payment') {
-      const ok = window.confirm('Simulate this invoice being paid in MaplePro demo data? This does not create a PayPal transaction.');
-      if (!ok) return;
-      if (element) { element.disabled = true; element.textContent = 'Updating…'; }
-      try {
-        const result = await api(`/api/invoices/${encodeURIComponent(id)}/simulate-payment`, { method: 'POST' });
-        await reloadDashboard(false);
-        showToast('Demo payment state updated', result.message);
-      } catch (err) { showToast('Payment update failed', err.message, true); }
-    }
+    if (action === 'remind') { openReminderDialog(id); return; }
   }
 
   async function handleInvoiceSubmit(event) {
@@ -366,7 +430,7 @@
       invoiceDialog.close();
       await reloadDashboard(false);
       navigate('invoices');
-      showToast(result.real_paypal ? 'Invoice sent through PayPal' : 'Demo invoice created', result.message);
+      showToast(result.real_paypal ? 'Invoice sent through PayPal' : 'Invoice saved', result.message);
       if (result.payer_url && result.real_paypal) {
         const openIt = window.confirm('PayPal returned a payer invoice link. Open it in a new tab?');
         if (openIt && result.payer_url.startsWith('https://')) window.open(result.payer_url, '_blank', 'noopener,noreferrer');
@@ -399,13 +463,27 @@
     const searchProject = event.target.closest('[data-action="search-project"]');
     if (searchProject) { event.preventDefault(); searchPopover.hidden = true; searchInput.value = ''; navigate('projects'); openProjectDialog(searchProject.dataset.id); return; }
     const searchInvoice = event.target.closest('[data-action="search-invoice"]');
-    if (searchInvoice) { event.preventDefault(); searchPopover.hidden = true; searchInput.value = ''; state.invoiceFilter = 'all'; navigate('invoices'); requestAnimationFrame(() => document.querySelector(`[data-invoice-row="${CSS.escape(searchInvoice.dataset.id)}"]`)?.scrollIntoView({ behavior:'smooth', block:'center' })); return; }
+    if (searchInvoice) { event.preventDefault(); searchPopover.hidden = true; searchInput.value = ''; state.invoiceFilter = 'all'; state.invoiceProjectFilter = null; const index = state.dashboard.invoices.findIndex(i => i.id === searchInvoice.dataset.id); state.invoicePage = Math.max(1, Math.floor(Math.max(0,index) / state.invoicePageSize) + 1); navigate('invoices'); requestAnimationFrame(() => document.querySelector(`[data-invoice-row="${CSS.escape(searchInvoice.dataset.id)}"]`)?.scrollIntoView({ behavior:'smooth', block:'center' })); return; }
     const reportTab = event.target.closest('[data-report-tab]');
     if (reportTab) { state.reportTab = reportTab.dataset.reportTab; renderView(); return; }
+    const overviewTab = event.target.closest('[data-overview-tab]');
+    if (overviewTab) { state.overviewTab = overviewTab.dataset.overviewTab; renderView(); return; }
+    const intelligenceTab = event.target.closest('[data-intelligence-tab]');
+    if (intelligenceTab) { state.intelligenceTab = intelligenceTab.dataset.intelligenceTab; renderView(); return; }
+    const invoicePage = event.target.closest('[data-invoice-page]');
+    if (invoicePage && !invoicePage.disabled) { state.invoicePage = Number(invoicePage.dataset.invoicePage); renderView(); return; }
     const nav = event.target.closest('[data-view]');
     if (nav) { navigate(nav.dataset.view); return; }
     const actionEl = event.target.closest('[data-action]');
-    if (actionEl) { event.preventDefault(); await handleAction(actionEl.dataset.action, actionEl.dataset.id, actionEl); return; }
+    if (actionEl) {
+      event.preventDefault();
+      const taskCard = actionEl.closest('[data-insight-card]');
+      const insightId = actionEl.dataset.insightId || taskCard?.dataset.insightId;
+      const shouldMoveTask = state.view === 'intelligence' && insightId && ['remind','view-project'].includes(actionEl.dataset.action);
+      await handleAction(actionEl.dataset.action, actionEl.dataset.id, actionEl);
+      if (shouldMoveTask) { moveInsightToNextSteps(insightId); renderView(); }
+      return;
+    }
     if (!event.target.closest('.global-search')) searchPopover.hidden = true;
   });
 
@@ -436,12 +514,15 @@
   document.getElementById('invoice-project').addEventListener('change', populateRecipientFromProject);
   viewRoot.addEventListener('change', event => {
     if (event.target.id === 'project-risk-filter') { state.projectFilter = event.target.value; renderView(); }
-    if (event.target.id === 'invoice-status-filter') { state.invoiceFilter = event.target.value; renderView(); }
+    if (event.target.id === 'invoice-status-filter') { state.invoiceFilter = event.target.value; state.invoicePage = 1; renderView(); }
   });
   viewRoot.addEventListener('keydown', event => {
-    if (!event.target.matches('.report-tab')) return;
-    const tabs = [...viewRoot.querySelectorAll('.report-tab')];
-    const current = tabs.indexOf(event.target);
+    const tab = event.target.closest('[role="tab"]');
+    if (!tab) return;
+    const selector = tab.dataset.reportTab !== undefined ? '[data-report-tab]' : tab.dataset.overviewTab !== undefined ? '[data-overview-tab]' : tab.dataset.intelligenceTab !== undefined ? '[data-intelligence-tab]' : null;
+    if (!selector) return;
+    const tabs = [...viewRoot.querySelectorAll(selector)];
+    const current = tabs.indexOf(tab);
     let next = current;
     if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
     else if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
@@ -449,9 +530,11 @@
     else if (event.key === 'End') next = tabs.length - 1;
     else return;
     event.preventDefault();
-    state.reportTab = tabs[next].dataset.reportTab;
+    if (tab.dataset.reportTab !== undefined) state.reportTab = tabs[next].dataset.reportTab;
+    if (tab.dataset.overviewTab !== undefined) state.overviewTab = tabs[next].dataset.overviewTab;
+    if (tab.dataset.intelligenceTab !== undefined) state.intelligenceTab = tabs[next].dataset.intelligenceTab;
     renderView();
-    viewRoot.querySelector(`.report-tab[data-report-tab="${state.reportTab}"]`)?.focus();
+    viewRoot.querySelector(`${selector}[aria-selected="true"]`)?.focus();
   });
   searchInput.addEventListener('input', () => {
     clearTimeout(state.searchTimer);
