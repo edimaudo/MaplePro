@@ -10,9 +10,10 @@ A small, runnable hackathon MVP for a construction command center. It starts wit
 - **Deterministic risk index**: overdue receivables, projected final-cost variance, progress-versus-plan, schedule projection, and near-term milestones.
 - **Trend-based forecasts**: project cost-at-completion and finish-date estimate using the seeded snapshot series. These are prototype estimates, not a trained or calibrated production prediction model.
 - **Gemini Flash narrative generation**: optional server-side call using `GEMINI_API_KEY` and a configurable model. If the key is absent or the API call fails, MaplePro clearly falls back to deterministic insights and does not pretend generated AI text was returned.
-- **PayPal capabilities**: create and send a PayPal Invoicing v2 invoice, send reminders for invoices that have a PayPal invoice ID, return the payer URL, and synchronize eligible invoice-paid events after server-side webhook verification.
+- **PayPal capabilities**: create and send client invoices through PayPal, return the payer URL, and synchronize invoice-paid events after server-side webhook verification. MaplePro prepares editable reminder emails in the user's email application; the sender reviews and sends the message.
 - **Supabase integration**: Supabase is the only database. The FastAPI backend uses the Supabase Data API through the existing `SUPABASE_URL` and API key; it does not require a PostgreSQL connection string or SQLAlchemy. Supabase Auth provides email/password sign-in when demo mode is disabled, and `supabase/schema.sql` defines the tables and row-level security policies.
-- **Tests** for the risk-engine calculation basics.
+- **Milestone replanning**: project managers can revise open milestone dates from the project detail or a critical-path insight. The current data model does not store activity durations or predecessor links, so it supports a manual milestone recovery plan rather than automated CPM calculation.
+- **Tests** for risk analysis, reminder UI, milestone replanning, and the main application UI contracts.
 
 ## Run locally
 
@@ -97,9 +98,7 @@ The Python risk engine owns the numbers. Gemini receives the computed metrics an
 
 6. Restart the API and test an actual sandbox invoice payment. The webhook route calls PayPal's `verify-webhook-signature` endpoint before accepting a status change and records event IDs to avoid duplicate processing.
 
-The PayPal integration is **credential-gated**. It cannot be end-to-end validated without your Sandbox app credentials and a publicly reachable HTTPS webhook URL. Seeded invoices do not have PayPal invoice IDs, so only invoices created through the connected PayPal workflow support real PayPal reminders or a returned payer URL.
-
-In demo mode, the **Simulate** action marks a local invoice record as paid solely for demonstrating the UI reaction. It does not call PayPal and does not represent a payment transaction. Keep that distinction in a judge demo.
+The PayPal integration is **credential-gated**. It cannot be end-to-end validated without your PayPal app credentials and a publicly reachable HTTPS webhook URL. Seeded invoices do not have PayPal invoice IDs, so they do not have a PayPal payer URL. When PayPal is not configured, MaplePro can retain invoice records but does not issue an external PayPal invoice or collect a PayPal payment. The reminder composer creates an editable `mailto:` draft; it does not send an email automatically. The user must review and send the message from their email application.
 
 ## Configure Supabase
 
@@ -127,7 +126,7 @@ A concise evaluation path:
 2. Sign in as `manager@maplepro.demo`.
 3. Start at **Command center** and inspect the overdue receivable and schedule/cost signals.
 4. Open **MaplePro Intelligence**. The unconfigured local app shows rule-based explanations; add a Gemini API key to demonstrate model-generated explanations.
-5. Open **Invoices & payments**, create a new invoice, then send a reminder on a seeded overdue invoice. When PayPal credentials are not configured, these actions are clearly recorded as demo-only actions.
+5. Open **Invoices & payments**, create a new invoice, then prepare an editable reminder for an outstanding invoice. The page shows whether PayPal invoice delivery and payment-status synchronization are configured.
 6. To test the real payment path, configure PayPal and create a *new* invoice so it has a PayPal invoice ID and payer link. Complete the payment using the Sandbox buyer and verify the webhook updates the invoice status.
 7. Sign out and enter through the Client or Subcontractor demo to inspect role-scoped project and invoice views.
 
@@ -141,9 +140,9 @@ A concise evaluation path:
 | `GET /api/search?q=...` | Search accessible project and invoice records |
 | `GET /api/intelligence` | Deterministic rule-based insights |
 | `POST /api/intelligence/refresh` | Gemini-assisted narrative with rule-based fallback |
-| `POST /api/invoices` | Create/send a PayPal invoice when configured; otherwise add local demo invoice |
-| `POST /api/invoices/{id}/remind` | PayPal reminder for a connected external invoice or explicitly local demo record |
-| `POST /api/invoices/{id}/simulate-payment` | Demo-mode-only local payment state simulation |
+| `POST /api/invoices` | Create/send a PayPal invoice when configured; otherwise retain the invoice record locally |
+| `POST /api/invoices/{id}/remind` | Provider reminder endpoint for a connected PayPal invoice |
+| `POST /api/projects/{project_id}/replan` | Save revised dates for open project milestones |
 | `POST /api/webhooks/paypal` | Verify webhook with PayPal before updating a matching invoice |
 | `GET /api/health` | App/integration readiness check |
 
@@ -159,6 +158,6 @@ python -m compileall app tests
 - Risk score is an interpretable index, not a probability that a project will fail.
 - Seeded snapshots are synthetic. Forecasts are trend extrapolations, not ML trained on actual construction histories.
 - Gemini produces narrative recommendations only; financial math and rule thresholds remain in Python.
-- A local simulated payment is not a PayPal transaction.
+- A manually revised milestone schedule is not a calculated critical-path network; activity durations and predecessor links are not stored in the current schema.
 - PayPal API, webhook, and Supabase sign-in flows require actual credentials and external configuration before they can be validated end-to-end.
 - This scaffold includes tenant scoping and RLS policies, but production deployment still requires a security review, HTTPS, secure secret management, audit logging, and tests for cross-tenant access.

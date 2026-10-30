@@ -6,13 +6,12 @@
   <title>Command Center — MaplePro</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=20261029-workspace-actions-tabs">
+  <link rel="stylesheet" href="/static/styles.css?v=20261030-reminders-replan-paypal">
 </head>
 <body class="workspace-page">
   <div class="app-shell" id="app-shell">
     <aside class="app-sidebar" id="app-sidebar">
       <div class="sidebar-head"><a class="brand" href="/"><span class="brand-mark">M</span><span>MaplePro</span></a><button class="icon-button sidebar-close" id="sidebar-close" aria-label="Close navigation">×</button></div>
-      <button class="workspace-switcher"><span class="firm-logo">N</span><span class="workspace-switcher-text"><b>Northline Group</b><small>Construction workspace</small></span><span class="switcher-chevron">⌄</span></button>
       <div class="sidebar-label">WORKSPACE</div>
       <nav class="sidebar-nav" aria-label="Workspace navigation">
         <button class="nav-item active" data-view="overview"><span class="nav-icon">◫</span><span>Command center</span><span class="nav-count" id="nav-risk-count">3</span></button>
@@ -28,7 +27,7 @@
     <div class="sidebar-scrim" id="sidebar-scrim"></div>
     <main class="app-main">
       <header class="app-topbar">
-        <div class="topbar-left"><button class="icon-button mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button><div class="breadcrumb"><span>Northline Group</span><b>/</b><strong id="breadcrumb-current">Command center</strong></div></div>
+        <div class="topbar-left"><button class="icon-button mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button><div class="breadcrumb"><strong id="breadcrumb-current">Command center</strong></div></div>
         <div class="topbar-actions">
           <div class="topbar-user"><span class="topbar-user-name" id="topbar-name">Olivia Chen</span><button class="topbar-signout" id="sign-out" type="button">Sign out</button></div>
           <div class="font-size-control" aria-label="Font size"><button type="button" data-font-size="small" aria-label="Small text" aria-pressed="false">A−</button><button type="button" data-font-size="medium" class="active" aria-label="Default text size" aria-pressed="true">A</button><button type="button" data-font-size="large" aria-label="Large text" aria-pressed="false">A+</button></div>
@@ -53,8 +52,9 @@
   </dialog>
   <dialog class="app-dialog project-dialog" id="project-dialog"></dialog>
   <dialog class="app-dialog reminder-dialog" id="reminder-dialog"></dialog>
+  <dialog class="app-dialog replan-dialog" id="replan-dialog"></dialog>
   <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/static/app.js?v=20261029-workspace-actions-tabs"></script>
+  <script src="/static/app.js?v=20261030-reminders-replan-paypal"></script>
 </body>
 </html>

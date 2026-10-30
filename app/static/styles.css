@@ -219,11 +219,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .sidebar-head { padding: 0 8px 23px; display: flex; justify-content: space-between; align-items: center; }
 .app-sidebar .brand { color: var(--app-ink); font-size: calc(18px * var(--font-scale, 1)); gap: 8px; letter-spacing: -.8px; }
 .app-sidebar .brand-mark { width: 29px; height: 29px; font-size: calc(15px * var(--font-scale, 1)); border-radius: 9px 3px 9px 3px; }
-.workspace-switcher { width: 100%; display: flex; align-items: center; text-align: left; gap: 9px; padding: 9px 8px; background: var(--app-surface-soft); color: var(--app-ink); border: 1px solid var(--app-line); border-radius: 9px; margin-bottom: 25px; }
 .firm-logo { display: grid; place-items: center; height: 30px; width: 30px; border-radius: 8px; background: #25483a; color: white; font-weight: 800; font-size: calc(13px * var(--font-scale, 1)); }
-.workspace-switcher-text { min-width: 0; flex: 1; }
-.workspace-switcher-text b { display: block; font-size: calc(12px * var(--font-scale, 1)); font-weight: 700; }
-.workspace-switcher-text small { display: block; font-size: calc(10px * var(--font-scale, 1)); color: var(--app-muted); margin-top: 4px; }
+
 .switcher-chevron { color: var(--app-muted); font-size: calc(16px * var(--font-scale, 1)); }
 .sidebar-label { padding: 0 10px 10px; font-size: calc(10px * var(--font-scale, 1)); letter-spacing: 1.15px; font-weight: 800; color: #9aa39c; }
 .sidebar-label-lower { margin-top: 22px; }
@@ -467,11 +464,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .project-dialog .project-detail-head { padding-right: 23px; }
 .project-dialog .dialog-close-form .icon-button { margin-right: 10px; }
 .toast-region { position: fixed; z-index: 40; right: 20px; bottom: 20px; display: grid; gap: 8px; width: min(360px, calc(100vw - 40px)); }
-.toast { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--app-line, #e7ebe6); background: var(--app-surface, #fff); color: var(--app-ink, #26342c); border-radius: 9px; box-shadow: 0 14px 45px rgba(20, 37, 28, .14); padding: 12px 13px; animation: toast-in .18s ease-out; }
-.toast-icon { width: 23px; height: 23px; border-radius: 7px; display: grid; place-items: center; background: var(--app-green-soft, #eaf3eb); color: var(--app-green, #2563a6); font-size: calc(12px * var(--font-scale, 1)); flex: 0 0 auto; }
-.toast.error .toast-icon { background: var(--app-orange-soft, #fff1e5); color: var(--app-orange, #c8753d); }
-.toast strong { font-size: calc(12px * var(--font-scale, 1)); display: block; }
-.toast p { margin: 4px 0 0; font-size: calc(11px * var(--font-scale, 1)); color: var(--app-muted, #7e8981); line-height: 1.5; }
+.toast { display:block; border:1px solid var(--app-line, #e7ebe6); border-left:3px solid var(--app-blue, #2563a6); background:var(--app-surface, #fff); color:var(--app-ink, #26342c); border-radius:9px; box-shadow:0 14px 45px rgba(20, 37, 28, .14); padding:13px 15px; animation:toast-in .18s ease-out; font-family:'Inter',Arial,sans-serif !important; }
+.toast.error { border-left-color:var(--app-orange, #c8753d); }
+.toast-copy { font-family:'Inter',Arial,sans-serif !important; }
+.toast strong { font-family:'Inter',Arial,sans-serif !important; font-size:calc(13px * var(--font-scale, 1)); font-weight:650; display:block; }
+.toast p { font-family:'Inter',Arial,sans-serif !important; margin:4px 0 0; font-size:calc(12px * var(--font-scale, 1)); color:var(--app-muted, #7e8981); line-height:1.55; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
 /* App dark-theme mappings */
@@ -809,4 +806,31 @@ html[data-theme="dark"] .dialog-close-form .icon-button { color:#f3f7fc; backgro
   .project-dialog .project-detail-head { padding:23px 56px 12px 17px; gap:8px; flex-direction:column; }
   .project-dialog .project-detail-body { padding:8px 17px 20px; }
   .project-dialog .project-detail-head .risk-chip { margin-top:4px; }
+}
+
+
+/* Payment workflow and milestone replanning. */
+.paypal-setup-panel, .paypal-workflow-panel { margin-bottom:16px; }
+.paypal-setup-summary { margin:0 20px 18px; max-width:920px; color:var(--app-muted); line-height:1.65; font-size:calc(13px * var(--font-scale, 1)); }
+.paypal-workflow-grid, .paypal-workflow-inline { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:0 20px 20px; }
+.paypal-workflow-grid article, .paypal-workflow-inline > div { min-width:0; padding:15px; border:1px solid var(--app-line); border-radius:9px; background:var(--app-surface-soft); }
+.paypal-step-number { display:inline-flex; align-items:center; justify-content:center; width:27px; height:27px; border-radius:7px; background:var(--app-blue-soft, #edf4fa); color:var(--app-blue, #2563a6); font-size:12px; font-weight:700; }
+.paypal-workflow-grid h3, .paypal-workflow-inline strong { display:block; margin:11px 0 5px; color:var(--app-ink); font-size:calc(13px * var(--font-scale, 1)); }
+.paypal-workflow-grid p, .paypal-workflow-inline p { margin:0; color:var(--app-muted); font-size:calc(12px * var(--font-scale, 1)); line-height:1.55; }
+.paypal-workflow-inline strong { margin:0 0 5px; }
+.reminder-help { margin:0; color:var(--app-muted); font-size:calc(12px * var(--font-scale, 1)); line-height:1.5; }
+.replan-dialog { width:min(850px, calc(100vw - 28px)); max-width:850px; }
+.replan-dialog .dialog-header { padding-right:66px; }
+.replan-note { margin:0 20px 14px; padding:12px 14px; border:1px solid var(--app-line); border-radius:8px; background:var(--app-surface-soft); color:var(--app-muted); font-size:calc(12px * var(--font-scale, 1)); line-height:1.55; }
+.replan-table-wrap { margin:0 20px 14px; }
+.replan-table-wrap .data-table { min-width:610px; }
+.replan-table-wrap .data-table td:first-child strong, .replan-table-wrap .data-table td:first-child small { display:block; }
+.replan-table-wrap .data-table td:first-child small { color:var(--app-muted); margin-top:4px; }
+.replan-table-wrap input[type=date] { min-width:145px; padding:8px; border:1px solid var(--app-line); border-radius:7px; background:var(--app-surface); color:var(--app-ink); font:inherit; }
+.replan-dialog .dialog-actions { padding:0 20px 20px; }
+@media (max-width:760px) {
+  .paypal-workflow-grid, .paypal-workflow-inline { grid-template-columns:1fr; padding-left:12px; padding-right:12px; }
+  .paypal-setup-summary { margin-left:12px; margin-right:12px; }
+  .replan-note, .replan-table-wrap { margin-left:12px; margin-right:12px; }
+  .replan-dialog .dialog-actions { padding-left:12px; padding-right:12px; }
 }

@@ -74,6 +74,8 @@ def test_reminder_composer_opens_an_editable_email_draft():
     assert 'id="reminder-dialog"' in html
     assert 'id="reminder-message"' in js
     assert "mailto:${encodeURIComponent(to).replace" in js
+    assert "draftLink.click()" in js
+    assert 'id="copy-reminder"' in js
     assert "Demo reminder recorded" not in js
 
 
@@ -112,6 +114,71 @@ def test_command_center_panels_are_in_tabs_not_all_rendered_at_once():
 def test_reminder_uses_email_draft_instead_of_recording_a_fake_send():
     js = (ROOT / "app" / "static" / "app.js").read_text()
     main = (ROOT / "app" / "main.py").read_text()
-    assert "window.location.href = mailto" in js
-    assert "Email draft opened" in js
+    assert "draftLink.click()" in js
+    assert "Reminder prepared" in js
     assert "No external email was sent" not in main
+
+
+
+def test_workspace_switcher_and_technical_database_labels_are_removed():
+    html = (ROOT / "app" / "static" / "app.html").read_text()
+    js = (ROOT / "app" / "static" / "app.js").read_text()
+    assert 'class="workspace-switcher"' not in html
+    assert "Supabase Data API" not in js
+    assert "Connected services" not in js
+
+
+def test_paypal_workflow_is_explained_in_business_language():
+    js = (ROOT / "app" / "static" / "app.js").read_text()
+    assert "How PayPal is used" in js
+    assert "Invoice delivery" in js
+    assert "Client payment" in js
+    assert "Payment updates" in js
+    assert "PayPal invoicing and payments" in js
+    assert "When PayPal is connected, MaplePro creates and sends the client invoice through PayPal." in js
+
+
+def test_critical_path_action_opens_editable_milestone_planner():
+    html = (ROOT / "app" / "static" / "app.html").read_text()
+    js = (ROOT / "app" / "static" / "app.js").read_text()
+    main = (ROOT / "app" / "main.py").read_text()
+    assert 'id="replan-dialog"' in html
+    assert 'data-action="replan-critical-path"' in js
+    assert "data-replan-milestone" in js
+    assert "/api/projects/${encodeURIComponent(projectId)}/replan" in js
+    assert '@app.post("/api/projects/{project_id}/replan")' in main
+
+
+def test_toasts_use_inter_and_do_not_render_tick_icons():
+    js = (ROOT / "app" / "static" / "app.js").read_text()
+    css = (ROOT / "app" / "static" / "styles.css").read_text()
+    assert 'toast.innerHTML = `<div class="toast-copy">' in js
+    assert ".toast-icon" not in css
+    assert ".toast { display:block;" in css
+    assert ".toast {" in css and "font-family:'Inter',Arial,sans-serif !important" in css
+
+
+
+def test_actioned_intelligence_uses_the_same_key_for_next_steps():
+    js = (ROOT / "app" / "static" / "app.js").read_text()
+    assert "const taskKey = insight => insight.project_id || insight.id" in js
+
+
+def test_project_dialog_exposes_replan_action_to_managers():
+    js = (ROOT / "app" / "static" / "app.js").read_text()
+    assert 'data-action="replan-critical-path" data-id="${escapeHtml(projectId)}"' in js
+
+
+def test_paypal_webhook_status_is_distinct_from_invoice_credentials():
+    main = (ROOT / "app" / "main.py").read_text()
+    js = (ROOT / "app" / "static" / "app.js").read_text()
+    assert '"paypal_webhook_configured": bool(settings.paypal_webhook_id)' in main
+    assert "state.config.paypal_webhook_configured" in js
+
+
+
+def test_reminder_and_milestone_actions_are_restricted_to_managers_in_insights():
+    js = (ROOT / "app" / "static" / "app.js").read_text()
+    assert "const canManageProject = ['admin','project_manager'].includes(state.user?.role)" in js
+    assert "insight.invoice_id && canManageProject" in js
+    assert "isCriticalPath && canManageProject" in js

@@ -103,6 +103,15 @@ class NewInvoiceRequest(BaseModel):
     due_in_days: int = Field(default=30, ge=0, le=180)
 
 
+class ReplanMilestoneDate(BaseModel):
+    id: str = Field(min_length=1, max_length=128)
+    planned_date: date
+
+
+class ReplanProjectRequest(BaseModel):
+    milestones: list[ReplanMilestoneDate] = Field(min_length=1, max_length=40)
+
+
 _DEMO_PASSWORD = "MaplePro2026!"
 
 
@@ -296,7 +305,7 @@ def _current_dashboard(principal: Principal) -> dict[str, Any]:
         "id": m["id"], "project_id": m["project_id"], "project_name": project_names.get(m["project_id"], "Project"),
         "title": m["title"], "planned_date": _as_date(m["planned_date"]).isoformat(),
         "progress_pct": float(m.get("progress_pct", 0) or 0), "status": m["status"],
-    } for m in next_milestones[:8]]
+    } for m in next_milestones]
     budget_total = sum(float(p["budget"]) for p in projects)
     actual_total = sum(float(p["actual_cost"]) for p in projects)
     committed_total = sum(float(p.get("committed_costs", 0) or 0) for p in projects)
@@ -313,9 +322,10 @@ def _current_dashboard(principal: Principal) -> dict[str, Any]:
         },
         "projects": project_json, "invoices": invoice_json, "milestones": milestone_json, "insights": _insight_cards(analyses),
         "integrations": {"gemini_configured": bool(settings.gemini_api_key), "gemini_model": settings.gemini_model,
-                         "paypal_configured": settings.paypal_configured, "demo_mode": settings.demo_mode,
-                         "supabase_auth": settings.supabase_auth_configured and not settings.demo_mode,
-                         "database_provider": "Supabase Data API" if settings.supabase_configured else "Not configured"},
+                         "paypal_configured": settings.paypal_configured,
+                         "paypal_webhook_configured": bool(settings.paypal_webhook_id),
+                         "demo_mode": settings.demo_mode,
+                         "supabase_auth": settings.supabase_auth_configured and not settings.demo_mode},
         "data_notice": "Forecasts use historical project snapshots and should be reviewed alongside current commitments.",
     }
 
@@ -323,6 +333,46 @@ def _current_dashboard(principal: Principal) -> dict[str, Any]:
 def _find_accessible_invoice(principal: Principal, invoice_id: str) -> dict[str, Any] | None:
     _projects, invoices, *_ = _gather_records(principal)
     return next((invoice for invoice in invoices if invoice.get("id") == invoice_id), None)
+
+
+@app.post("/api/projects/{project_id}/replan")
+def replan_project(project_id: str, body: ReplanProjectRequest, principal: Principal = Depends(get_principal)):
+    """Persist revised dates for open milestones within an accessible project."""
+    if principal.role not in {"admin", "project_manager"}:
+        raise HTTPException(status_code=403, detail="Only administrators and project managers can revise milestone dates.")
+
+    projects, _invoices, milestones, *_ = _gather_records(principal)
+    project = next((item for item in projects if item.get("id") == project_id), None)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found.")
+
+    project_milestones = {item["id"]: item for item in milestones if item.get("project_id") == project_id}
+    requested_ids = [item.id for item in body.milestones]
+    if len(requested_ids) != len(set(requested_ids)):
+        raise HTTPException(status_code=422, detail="Each milestone can only appear once in a revised plan.")
+    unknown = [milestone_id for milestone_id in requested_ids if milestone_id not in project_milestones]
+    if unknown:
+        raise HTTPException(status_code=404, detail="One or more milestones were not found in this project.")
+
+    for item in body.milestones:
+        current = project_milestones[item.id]
+        if str(current.get("status", "")).lower() == "complete" or current.get("actual_date") or float(current.get("progress_pct", 0) or 0) >= 100:
+            raise HTTPException(status_code=409, detail=f"Completed milestone '{current.get('title', item.id)}' cannot be rescheduled.")
+
+    updated_count = 0
+    for item in body.milestones:
+        current_date = _as_date(project_milestones[item.id]["planned_date"])
+        if current_date == item.planned_date:
+            continue
+        updated = update_one("milestones", item.id, {"planned_date": item.planned_date.isoformat()})
+        if not updated:
+            refreshed = one("milestones", filters=(("id", item.id),), columns="id,project_id,planned_date")
+            if not refreshed or _as_date(refreshed["planned_date"]) != item.planned_date:
+                raise HTTPException(status_code=503, detail="MaplePro could not save all revised milestone dates. Refresh the project and try again.")
+        updated_count += 1
+
+    return {"ok": True, "project_id": project_id, "project_name": project["name"], "updated_count": updated_count,
+            "message": "Milestone dates updated." if updated_count else "No milestone dates changed."}
 
 
 @app.get("/", include_in_schema=False)
@@ -353,7 +403,7 @@ def get_public_config():
         "supabase_anon_key": settings.supabase_anon_key if not settings.demo_mode else "",
         "demo_mode": settings.demo_mode, "gemini_configured": bool(settings.gemini_api_key),
         "gemini_model": settings.gemini_model, "paypal_configured": settings.paypal_configured,
-        "database_provider": "Supabase Data API" if settings.supabase_configured else "Not configured",
+        "paypal_webhook_configured": bool(settings.paypal_webhook_id),
     }
 
 
@@ -636,8 +686,8 @@ def health():
     except Exception:
         database_status = "unavailable"
     return {"status": "ok" if database_status == "connected" else "degraded", "demo_mode": settings.demo_mode,
-            "database": database_status, "database_provider": "Supabase Data API",
-            "paypal_configured": settings.paypal_configured, "gemini_configured": bool(settings.gemini_api_key)}
+            "database": database_status, "paypal_configured": settings.paypal_configured,
+            "gemini_configured": bool(settings.gemini_api_key)}
 
 
 @app.exception_handler(Exception)

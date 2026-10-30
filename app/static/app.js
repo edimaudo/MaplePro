@@ -7,9 +7,11 @@
   const toastRegion = document.getElementById('toast-region');
   const invoiceDialog = document.getElementById('invoice-dialog');
   const projectDialog = document.getElementById('project-dialog');
+  const reminderDialog = document.getElementById('reminder-dialog');
+  const replanDialog = document.getElementById('replan-dialog');
   const searchInput = document.getElementById('global-search');
   const searchPopover = document.getElementById('search-popover');
-  const state = { config: {}, dashboard: null, user: null, view: 'overview', intelligence: null, searchTimer: null, projectFilter: 'all', invoiceFilter: 'all', invoiceProjectFilter: null, invoicePage: 1, invoicePageSize: 10, reportTab: 'cost', overviewTab: 'priority', intelligenceTab: 'urgent', actionedInsights: new Set() };
+  const state = { config: {}, dashboard: null, user: null, view: 'overview', intelligence: null, searchTimer: null, projectFilter: 'all', invoiceFilter: 'all', invoiceProjectFilter: null, invoicePage: 1, invoicePageSize: 10, reminderInsightId: null, reportTab: 'cost', overviewTab: 'priority', intelligenceTab: 'urgent', actionedInsights: new Set() };
 
   const money = value => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(Number(value || 0));
   const money2 = value => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
@@ -36,7 +38,7 @@
   function showToast(title, message, isError = false) {
     const toast = document.createElement('div');
     toast.className = `toast${isError ? ' error' : ''}`;
-    toast.innerHTML = `<span class="toast-icon">${isError ? '!' : '✓'}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(message)}</p></div>`;
+    toast.innerHTML = `<div class="toast-copy"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(message)}</p></div>`;
     toastRegion.appendChild(toast);
     setTimeout(() => toast.remove(), 4800);
   }
@@ -116,7 +118,13 @@
     const action = insight.recommendation || insight.recommended_action || 'Review project signals';
     const source = insight.ai_generated ? 'Insight' : 'Signal';
     const confidence = insight.confidence_score ? `<div class="confidence-note"><strong>${escapeHtml(insight.confidence_score)}% signal confidence</strong> · based on data completeness, not a failure probability</div>` : '';
-    const button = insight.invoice_id ? `<button class="insight-action" data-action="remind" data-id="${escapeHtml(insight.invoice_id)}" data-insight-id="${escapeHtml(insight.id || '')}"><span>Prepare reminder</span><span>→</span></button>` : `<button class="insight-action" data-action="view-project" data-id="${escapeHtml(insight.project_id || '')}" data-insight-id="${escapeHtml(insight.id || '')}"><span>${escapeHtml(action)}</span><span>→</span></button>`;
+    const isCriticalPath = /critical path|milestone schedule/i.test(`${action} ${description}`);
+    const canManageProject = ['admin','project_manager'].includes(state.user?.role);
+    const button = insight.invoice_id && canManageProject
+      ? `<button type="button" class="insight-action" data-action="remind" data-id="${escapeHtml(insight.invoice_id)}" data-insight-id="${escapeHtml(insight.project_id || insight.id || '')}"><span>Prepare reminder</span><span>→</span></button>`
+      : isCriticalPath && canManageProject
+        ? `<button type="button" class="insight-action" data-action="replan-critical-path" data-id="${escapeHtml(insight.project_id || '')}" data-insight-id="${escapeHtml(insight.project_id || insight.id || '')}"><span>Re-plan milestones</span><span>→</span></button>`
+        : `<button type="button" class="insight-action" data-action="view-project" data-id="${escapeHtml(insight.project_id || '')}"><span>${escapeHtml(action)}</span><span>→</span></button>`;
     return `<article class="insight-card${compact ? ' compact' : ''}"><div class="insight-marker ${markerClass}">${markerClass === 'urgent' ? '!' : markerClass === 'medium' ? '↗' : '✓'}</div><div class="insight-body"><div class="insight-topline"><h3>${escapeHtml(headline)}</h3><span class="priority-label ${priorityClass}">${escapeHtml(priority)}</span></div><p class="insight-project">${escapeHtml(projectName)} · ${escapeHtml(source)}</p><p class="insight-explanation">${escapeHtml(description)}</p>${button}${confidence}</div></article>`;
   }
 
@@ -164,8 +172,8 @@
     return `<div class="table-wrap"><table class="data-table"><thead><tr><th>Invoice</th>${showProject ? '<th>Project</th>' : ''}<th>Bill to</th><th>Due date</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>${invoices.map(i => {
       let action = '';
       if (state.user.role === 'admin' || state.user.role === 'project_manager') {
-        if (i.status !== 'PAID') action += `<button class="table-action warn" data-action="remind" data-id="${escapeHtml(i.id)}">Prepare reminder</button>`;
-        if (i.paypal_view_url) action += ` <button class="table-action" data-action="open-invoice" data-url="${escapeHtml(i.paypal_view_url)}">Open</button>`;
+        if (i.status !== 'PAID') action += `<button type="button" class="table-action warn" data-action="remind" data-id="${escapeHtml(i.id)}">Prepare reminder</button>`;
+        if (i.paypal_view_url) action += ` <button type="button" class="table-action" data-action="open-invoice" data-url="${escapeHtml(i.paypal_view_url)}">Pay via PayPal</button>`;
       }
       if (i.status === 'PAID') action = `<span class="table-secondary">${i.paid_at ? `Paid ${shortDate(i.paid_at.slice(0,10))}` : 'Settled'}</span>`;
       if (!action) action = '<span class="table-secondary">View only</span>';
@@ -228,7 +236,8 @@
     const pagination = `<div class="invoice-pagination" aria-label="Invoice register pages"><span>Showing ${invoices.length ? startIndex + 1 : 0}–${Math.min(startIndex + pageInvoices.length, invoices.length)} of ${invoices.length}</span><div><button type="button" class="button button-outline button-sm" data-invoice-page="${state.invoicePage - 1}" ${state.invoicePage <= 1 ? 'disabled' : ''}>Previous</button><span class="invoice-page-count">Page ${state.invoicePage} of ${pageCount}</span><button type="button" class="button button-outline button-sm" data-invoice-page="${state.invoicePage + 1}" ${state.invoicePage >= pageCount ? 'disabled' : ''}>Next</button></div></div>`;
     const totalOutstanding = d.invoices.filter(i=>i.status!=='PAID' && i.invoice_type==='client_invoice').reduce((sum,i)=>sum+Number(i.amount),0);
     return `${pageHeader('CASH FLOW', 'Invoices & payments', 'Create invoices, follow up on outstanding balances, and reconcile payment status.', `${roleCanCreate ? '<button class="button button-primary" data-action="new-invoice">＋ Create invoice</button>' : ''}`)}
-      <div class="stats-grid"><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Outstanding amount</span><span class="stat-icon">$</span></div><div class="stat-value">${money(totalOutstanding)}</div><div class="stat-bottom">Unpaid client invoice records</div></article><article class="stat-card stat-danger"><div class="stat-card-top"><span class="stat-label">Overdue amount</span><span class="stat-icon">!</span></div><div class="stat-value">${money(d.stats.overdue_invoice_value)}</div><div class="stat-bottom">${d.stats.overdue_invoice_count} invoices past due</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Paid invoice records</span><span class="stat-icon">✓</span></div><div class="stat-value">${d.invoices.filter(i=>i.status==='PAID').length}</div><div class="stat-bottom">Payment state from provider and recorded events</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">PayPal integration</span><span class="stat-icon">↗</span></div><div class="stat-value" style="font-size:calc(19px * var(--font-scale, 1))">${state.config.paypal_configured?'Connected':'Not connected'}</div><div class="stat-bottom">${state.config.paypal_configured?'PayPal credentials are available':'Connect PayPal to send invoices and collect payments'}</div></article></div>
+      <div class="stats-grid"><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Outstanding amount</span><span class="stat-icon">$</span></div><div class="stat-value">${money(totalOutstanding)}</div><div class="stat-bottom">Unpaid client invoice records</div></article><article class="stat-card stat-danger"><div class="stat-card-top"><span class="stat-label">Overdue amount</span><span class="stat-icon">!</span></div><div class="stat-value">${money(d.stats.overdue_invoice_value)}</div><div class="stat-bottom">${d.stats.overdue_invoice_count} invoices past due</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">Paid invoice records</span><span class="stat-icon">✓</span></div><div class="stat-value">${d.invoices.filter(i=>i.status==='PAID').length}</div><div class="stat-bottom">Payment state from provider and recorded events</div></article><article class="stat-card"><div class="stat-card-top"><span class="stat-label">PayPal integration</span><span class="stat-icon">↗</span></div><div class="stat-value" style="font-size:calc(19px * var(--font-scale, 1))">${state.config.paypal_configured?'Configured':'Not configured'}</div><div class="stat-bottom">${state.config.paypal_configured?'Invoice delivery credentials are configured':'PayPal must be configured to send invoices and collect payments'}</div></article></div>
+      <section class="panel paypal-workflow-panel"><div class="panel-header"><div><h2 class="panel-title">How PayPal is used</h2><p class="panel-subtitle">Invoice delivery, client checkout, and payment reconciliation.</p></div><span class="status-pill ${state.config.paypal_configured ? 'complete' : 'draft'}">${state.config.paypal_configured ? 'Configured' : 'Setup required'}</span></div><div class="paypal-workflow-inline"><div><strong>Invoice delivery</strong><p>${state.config.paypal_configured ? 'New invoices are created and sent through PayPal.' : 'PayPal is not connected, so invoices are only recorded in MaplePro.'}</p></div><div><strong>Client payment</strong><p>${state.config.paypal_configured ? 'Clients receive a PayPal invoice link to complete payment.' : 'A PayPal payment link is not available until credentials are configured.'}</p></div><div><strong>Payment updates</strong><p>${state.config.paypal_webhook_configured ? 'Verified PayPal payment events update invoice status.' : 'Automatic payment status updates require the PayPal webhook.'}</p></div></div></section>
       <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Invoice register</h2><p class="panel-subtitle">${invoices.length} invoice records visible to your role</p></div>${filter}</div>${projectScope}${renderInvoiceTable(pageInvoices)}${pagination}</section>`;
   }
 
@@ -288,9 +297,23 @@
   }
 
   function renderSettings() {
-    const c = state.dashboard.integrations;
-    const row = (title, desc, value, good) => `<div class="settings-row"><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(desc)}</p></div><div class="settings-value"><strong style="color:${good?'var(--app-green)':'var(--app-orange)'}">${escapeHtml(value)}</strong></div></div>`;
-    return `${pageHeader('SETTINGS', 'Settings', 'Manage the services connected to your workspace.', '')}<section class="panel"><div class="panel-header"><div><h2 class="panel-title">Connected services</h2><p class="panel-subtitle">Connection status for project insights, invoices, and workspace data.</p></div></div><div class="settings-list">${row('Project insights','Generate explanations and recommended next actions',c.gemini_configured?'Connected':'Not connected',c.gemini_configured)}${row('Invoice payments','Create invoices, send reminders, and share payment links',c.paypal_configured?'Connected':'Not connected',c.paypal_configured)}${row('Workspace data','Projects, invoices, milestones, and progress history',(c.database_provider || 'Connected database'),true)}</div></section>`;
+    const connected = Boolean(state.dashboard.integrations?.paypal_configured);
+    const webhookConnected = Boolean(state.dashboard.integrations?.paypal_webhook_configured);
+    const status = !connected ? 'Not configured' : webhookConnected ? 'Invoice and payment sync configured' : 'Invoice delivery configured';
+    const detail = !connected
+      ? 'MaplePro can track invoice records, but it is not currently sending invoices through PayPal or synchronizing payments. The workspace owner must connect PayPal before external invoice delivery and payment collection can begin.'
+      : webhookConnected
+        ? 'New client invoices are created and sent through PayPal. Clients pay through the PayPal invoice page, and verified payment events update invoice status in MaplePro.'
+        : 'New client invoices are created and sent through PayPal, and clients can pay through the PayPal invoice page. Automatic payment status updates are not active until the PayPal webhook is configured.';
+    return `${pageHeader('SETTINGS', 'Settings', 'Review how client billing and payment processing work.', '')}
+      <section class="panel paypal-setup-panel"><div class="panel-header"><div><h2 class="panel-title">PayPal invoicing and payments</h2><p class="panel-subtitle">The payment workflow used by MaplePro.</p></div><span class="status-pill ${connected ? 'complete' : 'draft'}">${status}</span></div>
+        <p class="paypal-setup-summary">${detail}</p>
+        <div class="paypal-workflow-grid">
+          <article><span class="paypal-step-number">01</span><h3>Issue an invoice</h3><p>${connected ? 'MaplePro creates the client invoice in PayPal and sends it to the recipient.' : 'When PayPal is connected, MaplePro creates and sends the client invoice through PayPal.'}</p></article>
+          <article><span class="paypal-step-number">02</span><h3>Collect payment</h3><p>${connected ? 'The client opens the secure PayPal invoice page and completes payment.' : 'The client receives a PayPal payment page once invoice delivery is connected.'}</p></article>
+          <article><span class="paypal-step-number">03</span><h3>Reconcile status</h3><p>${webhookConnected ? 'PayPal sends a verified payment event and MaplePro updates the invoice to Paid.' : 'Automatic Paid status updates require the PayPal webhook to be configured.'}</p></article>
+        </div>
+      </section>`;
   }
 
   function renderView() {
@@ -354,21 +377,45 @@
     if (p.overdue_invoice_count) reasons.push(`${p.overdue_invoice_count} client invoice(s) overdue.`);
     if (p.projected_variance_pct > 2) reasons.push(`Projected final cost is ${p.projected_variance_pct.toFixed(1)}% above budget.`);
     if (p.schedule_slip_days > 0) reasons.push(`Current progress trend estimates completion ${p.schedule_slip_days} days after target.`);
-    projectDialog.innerHTML = `<form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close dialog">×</button></form><div class="project-detail-head"><div><div class="page-kicker">${escapeHtml(p.code)} · ${escapeHtml(p.stage)}</div><h2>${escapeHtml(p.name)}</h2><p>${escapeHtml(p.client_name)} · ${escapeHtml(p.location)}</p></div>${riskChip(p.risk_level)}</div><div class="project-detail-body"><div class="detail-metrics"><div class="detail-metric"><small>Budget</small><strong>${money(p.budget)}</strong></div><div class="detail-metric"><small>Actual cost</small><strong>${money(p.actual_cost)}</strong></div><div class="detail-metric"><small>Forecast final cost</small><strong>${money(p.projected_final_cost)}</strong></div></div><div class="detail-progress-labels"><span>Recorded progress</span><strong>${pct(p.progress_pct)}</strong></div><div class="detail-progress"><span style="width:${Math.min(100,p.progress_pct)}%"></span></div><div class="detail-progress-labels"><span>Target: ${fullDate(p.target_completion)}</span><span>Forecast: ${fullDate(p.predicted_finish)}</span></div><h3 class="detail-section-title">Why this project is flagged</h3>${reasons.length ? reasons.map(r=>`<div class="detail-reason">${escapeHtml(r)}</div>`).join('') : '<div class="detail-reason">No elevated signal from the current rule thresholds.</div>'}<h3 class="detail-section-title">Invoices in your view</h3>${relatedInvoices.length ? relatedInvoices.map(i=>`<div class="detail-reason"><strong>${escapeHtml(i.invoice_number)} · ${money(i.amount)}</strong><br>${escapeHtml(i.description)} · ${escapeHtml(cap(i.status))} · due ${fullDate(i.due_date)}</div>`).join('') : '<div class="detail-reason">No invoices visible for this project and role.</div>'}<h3 class="detail-section-title">Current forecast assumptions</h3><div class="detail-reason">Signal confidence: <strong>${p.confidence_score}%</strong>. This reflects sample count and completeness, not a calibrated probability of risk. Forecasts use the available project history.</div><div class="dialog-actions"><button type="button" class="button button-outline" data-action="close-project">Close</button>${relatedInvoices.some(i=>i.status!=='PAID') ? `<button type="button" class="button button-primary" data-action="go-invoices" data-id="${escapeHtml(projectId)}">View invoices →</button>`:''}</div></div>`;
+    projectDialog.innerHTML = `<form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close dialog">×</button></form><div class="project-detail-head"><div><div class="page-kicker">${escapeHtml(p.code)} · ${escapeHtml(p.stage)}</div><h2>${escapeHtml(p.name)}</h2><p>${escapeHtml(p.client_name)} · ${escapeHtml(p.location)}</p></div>${riskChip(p.risk_level)}</div><div class="project-detail-body"><div class="detail-metrics"><div class="detail-metric"><small>Budget</small><strong>${money(p.budget)}</strong></div><div class="detail-metric"><small>Actual cost</small><strong>${money(p.actual_cost)}</strong></div><div class="detail-metric"><small>Forecast final cost</small><strong>${money(p.projected_final_cost)}</strong></div></div><div class="detail-progress-labels"><span>Recorded progress</span><strong>${pct(p.progress_pct)}</strong></div><div class="detail-progress"><span style="width:${Math.min(100,p.progress_pct)}%"></span></div><div class="detail-progress-labels"><span>Target: ${fullDate(p.target_completion)}</span><span>Forecast: ${fullDate(p.predicted_finish)}</span></div><h3 class="detail-section-title">Why this project is flagged</h3>${reasons.length ? reasons.map(r=>`<div class="detail-reason">${escapeHtml(r)}</div>`).join('') : '<div class="detail-reason">No elevated signal from the current rule thresholds.</div>'}<h3 class="detail-section-title">Invoices in your view</h3>${relatedInvoices.length ? relatedInvoices.map(i=>`<div class="detail-reason"><strong>${escapeHtml(i.invoice_number)} · ${money(i.amount)}</strong><br>${escapeHtml(i.description)} · ${escapeHtml(cap(i.status))} · due ${fullDate(i.due_date)}</div>`).join('') : '<div class="detail-reason">No invoices visible for this project and role.</div>'}<h3 class="detail-section-title">Current forecast assumptions</h3><div class="detail-reason">Signal confidence: <strong>${p.confidence_score}%</strong>. This reflects sample count and completeness, not a calibrated probability of risk. Forecasts use the available project history.</div><div class="dialog-actions"><button type="button" class="button button-outline" data-action="close-project">Close</button>${['admin','project_manager'].includes(state.user.role) ? `<button type="button" class="button button-outline" data-action="replan-critical-path" data-id="${escapeHtml(projectId)}">Re-plan milestones</button>` : ''}${relatedInvoices.some(i=>i.status!=='PAID') ? `<button type="button" class="button button-primary" data-action="go-invoices" data-id="${escapeHtml(projectId)}">View invoices →</button>`:''}</div></div>`;
     projectDialog.showModal();
   }
 
-  function openReminderDialog(invoiceId) {
+  function openReminderDialog(invoiceId, insightId = null) {
     const invoice = state.dashboard.invoices.find(item => item.id === invoiceId);
     if (!invoice) { showToast('Invoice unavailable', 'This invoice is outside your current access scope.', true); return; }
+    if (invoice.status === 'PAID') { showToast('Invoice already paid', 'A reminder is not needed for this invoice.', true); return; }
+    state.reminderInsightId = insightId || null;
     const paymentLine = invoice.paypal_view_url
       ? `You can review the invoice and arrange payment here:\n${invoice.paypal_view_url}`
       : 'Please reply to this email if you need another copy of the invoice or would like to confirm payment arrangements.';
     const body = `Hello ${invoice.recipient_name},\n\nThis is a friendly reminder that invoice ${invoice.invoice_number} for ${money2(invoice.amount)} is outstanding. The due date was ${fullDate(invoice.due_date)}.\n\n${paymentLine}\n\nPlease let us know if payment has already been arranged or if you have any questions.\n\nRegards,\n${state.user.name}\nNorthline Group`;
-    document.getElementById('reminder-dialog').innerHTML = `<form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close dialog">×</button></form><div class="dialog-header"><h2>Prepare invoice reminder</h2><p>Review and edit the message before opening it in your email application.</p></div><form id="reminder-form" class="dialog-form"><label for="reminder-to">To</label><input id="reminder-to" type="email" required value="${escapeHtml(invoice.recipient_email)}"><label for="reminder-subject">Subject</label><input id="reminder-subject" required maxlength="200" value="${escapeHtml(`Reminder: Invoice ${invoice.invoice_number} is outstanding`)}"><label for="reminder-message">Message</label><textarea id="reminder-message" required rows="10">${escapeHtml(body)}</textarea><div class="reminder-context"><strong>${escapeHtml(invoice.invoice_number)} · ${money2(invoice.amount)}</strong><span>${escapeHtml(invoice.project_name)} · Due ${fullDate(invoice.due_date)}</span></div><div class="dialog-actions"><button type="button" class="button button-outline" id="cancel-reminder">Cancel</button><button class="button button-primary" type="submit">Open email draft <span>→</span></button></div></form>`;
-    document.getElementById('cancel-reminder').addEventListener('click', () => document.getElementById('reminder-dialog').close());
+    reminderDialog.innerHTML = `<form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close dialog">×</button></form><div class="dialog-header"><h2>Prepare invoice reminder</h2><p>Edit the recipient, subject, and message before opening your email application.</p></div><form id="reminder-form" class="dialog-form"><label for="reminder-to">To</label><input id="reminder-to" type="email" required value="${escapeHtml(invoice.recipient_email)}"><label for="reminder-subject">Subject</label><input id="reminder-subject" required maxlength="200" value="${escapeHtml(`Reminder: Invoice ${invoice.invoice_number} is outstanding`)}"><label for="reminder-message">Message</label><textarea id="reminder-message" required rows="10">${escapeHtml(body)}</textarea><div class="reminder-context"><strong>${escapeHtml(invoice.invoice_number)} · ${money2(invoice.amount)}</strong><span>${escapeHtml(invoice.project_name)} · Due ${fullDate(invoice.due_date)}</span></div><p class="reminder-help">Your email application should open with this draft. If it does not, use Copy message and paste it into an email.</p><div class="dialog-actions"><button type="button" class="button button-outline" id="cancel-reminder">Cancel</button><button type="button" class="button button-outline" id="copy-reminder">Copy message</button><button class="button button-primary" type="submit">Open email draft <span>→</span></button></div></form>`;
+    document.getElementById('cancel-reminder').addEventListener('click', () => reminderDialog.close());
+    document.getElementById('copy-reminder').addEventListener('click', copyReminderMessage);
     document.getElementById('reminder-form').addEventListener('submit', handleReminderSubmit);
-    document.getElementById('reminder-dialog').showModal();
+    if (!reminderDialog.open) reminderDialog.showModal();
+  }
+
+  async function copyReminderMessage() {
+    const to = document.getElementById('reminder-to').value.trim();
+    const subject = document.getElementById('reminder-subject').value.trim();
+    const message = document.getElementById('reminder-message').value;
+    const contents = `To: ${to}\nSubject: ${subject}\n\n${message}`;
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(contents);
+      else {
+        const fallback = document.createElement('textarea');
+        fallback.value = contents;
+        fallback.style.position = 'fixed'; fallback.style.opacity = '0';
+        document.body.appendChild(fallback); fallback.select();
+        const copied = document.execCommand('copy'); fallback.remove();
+        if (!copied) throw new Error('Clipboard access is unavailable.');
+      }
+      showToast('Message copied', 'Paste the reminder into your email application.');
+    } catch (_) {
+      showToast('Could not copy message', 'Select the message text and copy it manually.', true);
+    }
   }
 
   function handleReminderSubmit(event) {
@@ -376,11 +423,68 @@
     const to = document.getElementById('reminder-to').value.trim();
     const subject = document.getElementById('reminder-subject').value.trim();
     const message = document.getElementById('reminder-message').value;
-    if (!to || !subject || !message.trim()) return;
+    if (!to || !subject || !message.trim()) {
+      showToast('Complete the reminder', 'Enter a recipient, subject, and message before opening the draft.', true);
+      return;
+    }
     const mailto = `mailto:${encodeURIComponent(to).replace(/%40/gi, '@')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-    document.getElementById('reminder-dialog').close();
-    window.location.href = mailto;
-    showToast('Email draft opened', 'Review the message in your email application and send it when ready.');
+    // Use a real anchor click in the user gesture. Keep a copy fallback available
+    // because browsers cannot confirm whether an email application is installed.
+    const draftLink = document.createElement('a');
+    draftLink.href = mailto;
+    draftLink.style.display = 'none';
+    document.body.appendChild(draftLink);
+    draftLink.click();
+    draftLink.remove();
+    reminderDialog.close();
+    if (state.reminderInsightId) {
+      moveInsightToNextSteps(state.reminderInsightId);
+      state.reminderInsightId = null;
+      if (state.view === 'intelligence') renderView();
+    }
+    showToast('Reminder prepared', 'Your email application should open with the editable draft. If it does not, reopen the reminder and copy the message.');
+  }
+
+  function openReplanDialog(projectId, insightId = null) {
+    const project = projectById(projectId);
+    if (!project) { showToast('Project unavailable', 'The selected project is outside your current access scope.', true); return; }
+    if (!['admin','project_manager'].includes(state.user.role)) { showToast('Access restricted', 'Only administrators and project managers can revise milestone dates.', true); return; }
+    const milestones = (state.dashboard.milestones || [])
+      .filter(item => item.project_id === projectId && String(item.status || '').toLowerCase() !== 'complete' && Number(item.progress_pct || 0) < 100)
+      .sort((a,b) => String(a.planned_date).localeCompare(String(b.planned_date)));
+    if (!milestones.length) { showToast('No open milestones', 'There are no outstanding milestones available to re-plan for this project.', true); return; }
+    replanDialog.dataset.projectId = projectId;
+    replanDialog.dataset.insightId = insightId || '';
+    const rows = milestones.map((item, index) => `<tr><td><strong>${escapeHtml(item.title)}</strong><small>${pct(item.progress_pct)} complete</small></td><td>${fullDate(item.planned_date)}</td><td><input type="date" required aria-label="Revised date for ${escapeHtml(item.title)}" data-replan-milestone="${escapeHtml(item.id)}" value="${escapeHtml(item.planned_date)}"></td></tr>`).join('');
+    replanDialog.innerHTML = `<form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Close dialog">×</button></form><div class="dialog-header"><h2>Re-plan milestone schedule</h2><p>${escapeHtml(project.name)} · Review remaining milestones and revise the dates your team has agreed to.</p></div><form id="replan-form" class="dialog-form"><div class="replan-note">This planner updates the project's milestone dates. Predecessor links and activity durations are not currently recorded, so MaplePro does not calculate a network critical path automatically.</div><div class="table-wrap replan-table-wrap"><table class="data-table"><thead><tr><th>Milestone</th><th>Current date</th><th>Revised date</th></tr></thead><tbody>${rows}</tbody></table></div><div class="dialog-actions"><button type="button" class="button button-outline" id="cancel-replan">Cancel</button><button type="submit" class="button button-primary" id="save-replan">Save revised dates</button></div></form>`;
+    document.getElementById('cancel-replan').addEventListener('click', () => replanDialog.close());
+    document.getElementById('replan-form').addEventListener('submit', handleReplanSubmit);
+    if (!replanDialog.open) replanDialog.showModal();
+  }
+
+  async function handleReplanSubmit(event) {
+    event.preventDefault();
+    const projectId = replanDialog.dataset.projectId;
+    const items = [...replanDialog.querySelectorAll('[data-replan-milestone]')].map(input => ({ id: input.dataset.replanMilestone, planned_date: input.value }));
+    if (!items.length || items.some(item => !item.planned_date)) {
+      showToast('Complete the revised dates', 'Enter a date for each open milestone before saving.', true);
+      return;
+    }
+    const submit = document.getElementById('save-replan');
+    submit.disabled = true; submit.textContent = 'Saving…';
+    try {
+      const result = await api(`/api/projects/${encodeURIComponent(projectId)}/replan`, { method: 'POST', body: JSON.stringify({ milestones: items }) });
+      const insightId = replanDialog.dataset.insightId;
+      replanDialog.close();
+      await reloadDashboard(false);
+      if (insightId) moveInsightToNextSteps(insightId);
+      if (state.view === 'intelligence' && insightId) renderView();
+      showToast('Milestone plan updated', `${result.updated_count} milestone date(s) were saved for ${result.project_name}.`);
+    } catch (err) {
+      showToast('Could not update milestone plan', err.message, true);
+    } finally {
+      if (submit) { submit.disabled = false; submit.textContent = 'Save revised dates'; }
+    }
   }
 
   async function refreshAI() {
@@ -410,7 +514,8 @@
       if (!url.startsWith('https://')) { showToast('Invoice link blocked', 'Only HTTPS PayPal invoice links may be opened.', true); return; }
       window.open(url, '_blank', 'noopener,noreferrer'); return;
     }
-    if (action === 'remind') { openReminderDialog(id); return; }
+    if (action === 'remind') { openReminderDialog(id, element?.dataset.insightId || null); return; }
+    if (action === 'replan-critical-path') { if (projectDialog.open) projectDialog.close(); openReplanDialog(id, element?.dataset.insightId || null); return; }
   }
 
   async function handleInvoiceSubmit(event) {
@@ -478,10 +583,12 @@
     if (actionEl) {
       event.preventDefault();
       const taskCard = actionEl.closest('[data-insight-card]');
-      const insightId = actionEl.dataset.insightId || taskCard?.dataset.insightId;
-      const shouldMoveTask = state.view === 'intelligence' && insightId && ['remind','view-project'].includes(actionEl.dataset.action);
-      await handleAction(actionEl.dataset.action, actionEl.dataset.id, actionEl);
-      if (shouldMoveTask) { moveInsightToNextSteps(insightId); renderView(); }
+      if (!actionEl.dataset.insightId && taskCard?.dataset.insightId) actionEl.dataset.insightId = taskCard.dataset.insightId;
+      try {
+        await handleAction(actionEl.dataset.action, actionEl.dataset.id, actionEl);
+      } catch (err) {
+        showToast('Action could not be completed', err.message || 'Please try again.', true);
+      }
       return;
     }
     if (!event.target.closest('.global-search')) searchPopover.hidden = true;
